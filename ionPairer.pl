@@ -740,6 +740,9 @@ sub checkParams {
     #
     GetOptions( \%options, @standard_options);
 
+    # Default to current directory if no directory is given
+    $options{'working_dir'} = '.' unless defined($options{'working_dir'});
+
     # if no arguments supplied print the usage and exit
     #
     exec("pod2usage $0") if (0 == (keys (%options) ));
