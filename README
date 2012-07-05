@@ -26,17 +26,21 @@
 
   Usage:
 
-     Take your existsing assembly, bin out the contigs of interest and then
+     Take your existing assembly, bin out the contigs of interest and then
 run bwa-long twice (once for each of the forward and reverse reads) to map your
 ion MP reads against your contigs.
 
-    Then simply run this script. There are a few hard-coded options lurking
+    Then simply run ionPairer.pl script. There are a few hard-coded options lurking
 within but the up and up is that it will detect pairs, wrongly mapped regions
 unpaired reads etc. It can determine orientation and insert size automagically.
 
     The most useful output is a .gv file which you can use to visualise the 
 pairings using graphviz. Use this visualisation to remove spurious pairings and
 redraw etc. This script is quite useful for making rough scaffold maps.
+
+    Once edited the .gv file, use the scaffolder.pl script to create the scaffolds.
+The script will orient the contigs (forward or reverse complement) and scaffold 
+the contigs with 25 Ns between each contig.
     
 *******************************************************************************
 *******************************************************************************
