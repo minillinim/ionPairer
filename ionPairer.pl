@@ -34,6 +34,7 @@ use Carp;
 use File::Spec;
 use File::Basename;
 use Bio::SeqIO;
+use Data::Dumper;
 
 #locally-written modules
 
@@ -144,6 +145,7 @@ foreach my $sam_fn (@samfiles)
                 # make sure there's a container for our read ID
                 my $read_id = $sam_fields[0];
                 $read_id =~ s/_.$//;
+                $read_id =~ s/\.[rf]$//;
                 my $position = int($sam_fields[3]);
                 my $prob = int($sam_fields[4]);
                 if(!exists $global_reads_2_map{$read_id})
