@@ -76,14 +76,15 @@ my %global_con_2_len = ();         # contig integerss versus lengths
 my %global_reads_2_map = ();       # reads vs mapping info
 
 # get output file names and handles
-my $l_file = File::Spec->catfile($global_options->{'working_dir'}, $global_options->{'sam1'}.".links.csv");
-my $p_file = File::Spec->catfile($global_options->{'working_dir'}, $global_options->{'sam1'}.".paired.csv");
-my $u_file = File::Spec->catfile($global_options->{'working_dir'}, $global_options->{'sam1'}.".unpaired.csv");
-my $ep_file = File::Spec->catfile($global_options->{'working_dir'}, $global_options->{'sam1'}.".perrors.csv");
-my $el_file = File::Spec->catfile($global_options->{'working_dir'}, $global_options->{'sam1'}.".lerrors.csv");
-my $al_file = File::Spec->catfile($global_options->{'working_dir'}, $global_options->{'sam1'}.".lamb.csv");
-my $s_file = File::Spec->catfile($global_options->{'working_dir'}, $global_options->{'sam1'}.".summary.gv");
-my $pcr_duplicate_file = File::Spec->catfile($global_options->{'working_dir'}, $global_options->{'sam1'}.".pcr_duplicates.csv");
+my ($file_root, undef, undef) = fileparse($global_options->{'sam1'});
+my $l_file = File::Spec->catfile($global_options->{'working_dir'}, $file_root.".links.csv");
+my $p_file = File::Spec->catfile($global_options->{'working_dir'}, $file_root.".paired.csv");
+my $u_file = File::Spec->catfile($global_options->{'working_dir'}, $file_root.".unpaired.csv");
+my $ep_file = File::Spec->catfile($global_options->{'working_dir'}, $file_root.".perrors.csv");
+my $el_file = File::Spec->catfile($global_options->{'working_dir'}, $file_root.".lerrors.csv");
+my $al_file = File::Spec->catfile($global_options->{'working_dir'}, $file_root.".lamb.csv");
+my $s_file = File::Spec->catfile($global_options->{'working_dir'}, $file_root.".summary.gv");
+my $pcr_duplicate_file = File::Spec->catfile($global_options->{'working_dir'}, $file_root.".pcr_duplicates.csv");
 
 open my $l_fh, ">", $l_file or die "**ERROR: could not open link output file $l_file $!\n";
 open my $p_fh, ">", $p_file or die "**ERROR: could not open paired output file $p_file $!\n";
@@ -294,10 +295,10 @@ $stdev /= (scalar @diffs-1);
 $stdev = $stdev ** 0.5;
 
 print "Stats estimate:\n";
-print "Mean: $mean\nStdev: $stdev\nRAW: ";
-print "Found $type_array[2] read pairs facing inwards on the same contig (type 2). This is what you want for IonTorrent mate pair data.\n";
-print "Found $type_array[0] read pairs facing outwards on the same contig (type 0). This is not what you want for mate pair data.\n";
-print "Found $type_array[1] read pairs facing the same direction on the same contig (type 1). This is not what you want for IonTorrent mate pair data.\n";
+print "Mean: $mean\nStdev: $stdev\n";
+print "Found $type_array[2] read pairs facing inwards on the same contig (type 2 read pairs). This is what you want for IonTorrent mate pair data.\n";
+print "Found $type_array[0] read pairs facing outwards on the same contig (type 0 read pairs). This is not what you want for mate pair data.\n";
+print "Found $type_array[1] read pairs facing the same direction on the same contig (type 1 read pairs). This is not what you want for IonTorrent mate pair data.\n";
 print "\nProceding using type $true_type as the expected mate pair type\n*****\n";
 
 # we only care about reads which match the given type and
