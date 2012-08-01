@@ -181,6 +181,10 @@ foreach my $sam_fn (@samfiles)
 }
 
 
+
+
+
+
 #=================================================================================================
 # Remove PCR duplicates. A duplicate is defined as:
 # 1. both ends map to the same positions on the contigs
@@ -189,12 +193,14 @@ print "Before PCR deduplication, there was ".keys(%global_reads_2_map)." reads (
 print "Removing PCR duplicates where both ends are mapped...\n";
 my %already_mapped_contigs_positions = ();
 my $number_of_duplicates_removed = 0;
-my $original_number_of_seqs = keys(%global_reads_2_map);
+my $original_number_of_pairs = 0;
 foreach my $read_id (keys %global_reads_2_map)
 {
     my @array = @{$global_reads_2_map{$read_id}};
     if($#array == 7)# if both ends mapped, and no chimeras detected
     {
+        $original_number_of_pairs += 1;
+        
         my $contig1 = $array[0];
         my $contig2 = $array[4];
         my $position1 = $array[1];
@@ -220,8 +226,9 @@ foreach my $read_id (keys %global_reads_2_map)
         }
     }
 }
-print "Removed $number_of_duplicates_removed PCR duplicates, leaving ".keys(%global_reads_2_map)." reads in \%global_reads_2_map.\n";
-my $percent_duplicate = (1.0-keys(%global_reads_2_map)/$original_number_of_seqs)*100;
+my $number_after_deduplication = $original_number_of_pairs-$number_of_duplicates_removed;
+print "Removed $number_of_duplicates_removed PCR duplicates, leaving ".$number_after_deduplication." reads pairs with both ends mapped in \%global_reads_2_map.\n";
+my $percent_duplicate = ($number_of_duplicates_removed/$original_number_of_pairs)*100;
 print $percent_duplicate."% of sequences were PCR duplicates\n\n";
 
 
