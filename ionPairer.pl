@@ -5,7 +5,7 @@
 #
 #   Work out paired mappings based on information in a sam file
 #
-#   Copyright (C) Michael Imelfort
+#   Copyright (C) Michael Imelfort, Ben Woodcroft
 #
 #   This program is free software: you can redistribute it and/or modify
 #   it under the terms of the GNU General Public License as published by
@@ -76,21 +76,24 @@ my %global_con_2_len = ();         # contig integerss versus lengths
 my %global_reads_2_map = ();       # reads vs mapping info
 
 # get output file names and handles
-my $l_file = File::Spec->catfile($global_options->{'working_dir'}, $global_options->{'sam1'}.".links.csv");
-my $p_file = File::Spec->catfile($global_options->{'working_dir'}, $global_options->{'sam1'}.".paired.csv");
-my $u_file = File::Spec->catfile($global_options->{'working_dir'}, $global_options->{'sam1'}.".unpaired.csv");
-my $ep_file = File::Spec->catfile($global_options->{'working_dir'}, $global_options->{'sam1'}.".perrors.csv");
-my $el_file = File::Spec->catfile($global_options->{'working_dir'}, $global_options->{'sam1'}.".lerrors.csv");
-my $al_file = File::Spec->catfile($global_options->{'working_dir'}, $global_options->{'sam1'}.".lamb.csv");
-my $s_file = File::Spec->catfile($global_options->{'working_dir'}, $global_options->{'sam1'}.".summary.gv");
+my ($file_root, undef, undef) = fileparse($global_options->{'sam1'});
+my $l_file = File::Spec->catfile($global_options->{'working_dir'}, $file_root.".links.csv");
+my $p_file = File::Spec->catfile($global_options->{'working_dir'}, $file_root.".paired.csv");
+my $u_file = File::Spec->catfile($global_options->{'working_dir'}, $file_root.".unpaired.csv");
+my $ep_file = File::Spec->catfile($global_options->{'working_dir'}, $file_root.".perrors.csv");
+my $el_file = File::Spec->catfile($global_options->{'working_dir'}, $file_root.".lerrors.csv");
+my $al_file = File::Spec->catfile($global_options->{'working_dir'}, $file_root.".lamb.csv");
+my $s_file = File::Spec->catfile($global_options->{'working_dir'}, $file_root.".summary.gv");
+my $pcr_duplicate_file = File::Spec->catfile($global_options->{'working_dir'}, $file_root.".pcr_duplicates.csv");
 
-open my $l_fh, ">", $l_file or die "**ERROR: could not open link file $l_file $!\n";
-open my $p_fh, ">", $p_file or die "**ERROR: could not open paired file $p_file $!\n";
-open my $u_fh, ">", $u_file or die "**ERROR: could not open unpaired file $u_file $!\n";
-open my $ep_fh, ">", $ep_file or die "**ERROR: could not open error_pair file $ep_file $!\n";
-open my $el_fh, ">", $el_file or die "**ERROR: could not open error_link file $el_file $!\n";
-open my $al_fh, ">", $al_file or die "**ERROR: could not open ambiguous file $al_file $!\n";
-open my $s_fh, ">", $s_file or die "**ERROR: could not open summary file $s_file $!\n";
+open my $l_fh, ">", $l_file or die "**ERROR: could not open link output file $l_file $!\n";
+open my $p_fh, ">", $p_file or die "**ERROR: could not open paired output file $p_file $!\n";
+open my $u_fh, ">", $u_file or die "**ERROR: could not open unpaired output file $u_file $!\n";
+open my $ep_fh, ">", $ep_file or die "**ERROR: could not open error_pair output file $ep_file $!\n";
+open my $el_fh, ">", $el_file or die "**ERROR: could not open error_link output file $el_file $!\n";
+open my $al_fh, ">", $al_file or die "**ERROR: could not open ambiguous output file $al_file $!\n";
+open my $s_fh, ">", $s_file or die "**ERROR: could not open summary output file $s_file $!\n";
+open my $pcr_duplicate_fh, ">", $pcr_duplicate_file or die "**ERROR: could not open pcr duplicate output file $s_file $!\n";
 
 # parse the sam files
 my @samfiles = ($global_options->{'sam1'},$global_options->{'sam2'});
@@ -177,6 +180,62 @@ foreach my $sam_fn (@samfiles)
     close $sam_fh;
 }
 
+
+
+
+
+
+#=================================================================================================
+# Remove PCR duplicates. A duplicate is defined as:
+# 1. both ends map to the same positions on the contigs
+print "\n";
+print "Before PCR deduplication, there was ".keys(%global_reads_2_map)." reads (possibly PCR duplicates, single end mapped or chimeric) in \%global_reads_2_map\n";
+print "Removing PCR duplicates where both ends are mapped...\n";
+my %already_mapped_contigs_positions = ();
+my $number_of_duplicates_removed = 0;
+my $original_number_of_pairs = 0;
+foreach my $read_id (keys %global_reads_2_map)
+{
+    my @array = @{$global_reads_2_map{$read_id}};
+    if($#array == 7)# if both ends mapped, and no chimeras detected
+    {
+        $original_number_of_pairs += 1;
+        
+        my $contig1 = $array[0];
+        my $contig2 = $array[4];
+        my $position1 = $array[1];
+        my $position2 = $array[5];
+        my $direction1 = $array[3];
+        my $direction2 = $array[7];
+        my @key_parts = (
+                         $contig1.'_'.$position1.'_'.$direction1,
+                         $contig2.'_'.$position2.'_'.$direction2
+                         );
+        @key_parts = sort @key_parts; #sort so that prdering of the pairs is irrelevant
+        my $deduplication_key = $key_parts[0].'__'.$key_parts[1];
+        #print $deduplication_key."\n"; #debug
+        
+        # it is a duplicate if both ends map to the same positions in the same contigs
+        if(exists $already_mapped_contigs_positions{$deduplication_key}){
+            $number_of_duplicates_removed += 1;
+            print $pcr_duplicate_fh join("\t", ($contig1, $position1, $direction1, $contig2, $position2, $direction2))."\n";
+            delete $global_reads_2_map{$read_id};
+        } else {
+            # else this is the first time that it has been mapped
+            $already_mapped_contigs_positions{$deduplication_key} = 1;
+        }
+    }
+}
+my $number_after_deduplication = $original_number_of_pairs-$number_of_duplicates_removed;
+print "Removed $number_of_duplicates_removed PCR duplicates, leaving ".$number_after_deduplication." reads pairs with both ends mapped in \%global_reads_2_map.\n";
+my $percent_duplicate = ($number_of_duplicates_removed/$original_number_of_pairs)*100;
+print $percent_duplicate."% of sequences were PCR duplicates\n\n";
+
+
+
+
+
+#=================================================================================================
 # now go through and make up the results files
 print "Determining insert size and orientation...\n";
 my $cum_diff = 0;       # stats holders
@@ -243,12 +302,11 @@ $stdev /= (scalar @diffs-1);
 $stdev = $stdev ** 0.5;
 
 print "Stats estimate:\n";
-print "Mean: $mean\nStdev: $stdev\nRAW: ";
-for my $i (0..2)
-{
-    print "($i : ".$type_array[$i].") ";
-}
-print "\nType: $true_type\n*****\n";
+print "Mean: $mean\nStdev: $stdev\n";
+print "Found $type_array[2] read pairs facing inwards on the same contig (type 2 read pairs). This is what you want for IonTorrent mate pair data.\n";
+print "Found $type_array[0] read pairs facing outwards on the same contig (type 0 read pairs). This is not what you want for mate pair data.\n";
+print "Found $type_array[1] read pairs facing the same direction on the same contig (type 1 read pairs). This is not what you want for IonTorrent mate pair data.\n";
+print "\nProceding using type $true_type as the expected mate pair type\n*****\n";
 
 # we only care about reads which match the given type and
 # have an insert size comparable to the distribution
@@ -270,6 +328,10 @@ my $upper_limit = $mean + $stdev * $tol;
 #
 ##
 my %type_table = ();
+# S: start
+# E: end
+# F: forward
+# R: reverse
 $type_table{'0000'} = 0; # 1SF 2SF
 $type_table{'0001'} = 1; # 1SF 2SR
 $type_table{'0010'} = 1; # 1SF 2EF
@@ -912,7 +974,7 @@ sub printAtStart {
 print<<"EOF";
 ----------------------------------------------------------------
 $0
-Copyright (C) Michael Imelfort
+Copyright (C) Michael Imelfort, Ben Woodcroft
 This program comes with ABSOLUTELY NO WARRANTY;
 This is free software, and you are welcome to redistribute it
 under certain conditions: See the source for more details.
@@ -928,7 +990,7 @@ __Script__Name__
 
 =head1 COPYRIGHT
 
-    copyright (C) Michael Imelfort
+    copyright (C) Michael Imelfort, Ben Woodcroft
     
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
