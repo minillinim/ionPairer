@@ -85,6 +85,7 @@ my $el_file = File::Spec->catfile($global_options->{'working_dir'}, $file_root."
 my $al_file = File::Spec->catfile($global_options->{'working_dir'}, $file_root.".lamb.csv");
 my $s_file = File::Spec->catfile($global_options->{'working_dir'}, $file_root.".summary.gv");
 my $pcr_duplicate_file = File::Spec->catfile($global_options->{'working_dir'}, $file_root.".pcr_duplicates.csv");
+my $all_links_file = File::Spec->catfile($global_options->{'working_dir'}, $file_root.".all_links.csv");
 
 open my $l_fh, ">", $l_file or die "**ERROR: could not open link output file $l_file $!\n";
 open my $p_fh, ">", $p_file or die "**ERROR: could not open paired output file $p_file $!\n";
@@ -93,7 +94,9 @@ open my $ep_fh, ">", $ep_file or die "**ERROR: could not open error_pair output 
 open my $el_fh, ">", $el_file or die "**ERROR: could not open error_link output file $el_file $!\n";
 open my $al_fh, ">", $al_file or die "**ERROR: could not open ambiguous output file $al_file $!\n";
 open my $s_fh, ">", $s_file or die "**ERROR: could not open summary output file $s_file $!\n";
-open my $pcr_duplicate_fh, ">", $pcr_duplicate_file or die "**ERROR: could not open pcr duplicate output file $s_file $!\n";
+open my $pcr_duplicate_fh, ">", $pcr_duplicate_file or die "**ERROR: could not open pcr duplicate output file $pcr_duplicate_file $!\n";
+open my $all_links_fh, ">", $all_links_file or die "**ERROR: could not open pcr duplicate output file $all_links_file $!\n";
+
 
 # parse the sam files
 my @samfiles = ($global_options->{'sam1'},$global_options->{'sam2'});
@@ -104,83 +107,83 @@ foreach my $sam_fn (@samfiles)
     open my $sam_fh, "<", $sam_fn or die "**ERROR: could not open sam file $!\n";
     while(<$sam_fh>)
     {
-        chomp $_;
-        if($_ =~ /^@/)
-        {
-            # work out and store contig lengths
-            next if(1 != $first_sam);
-            my @fields = split(/:/, $_);
-            $fields[1] =~ s/\tLN//;
-            my $con_id = $fields[1];
-            my $con_int = 0;
-            if(!exists $global_con_2_int{$con_id})
-            {
-                $con_int = $global_conInt;
-                $global_conInt++;
-                $global_con_2_int{$con_id} = $con_int;
-                $global_int_2_con{$con_int} = $con_id;
-            }
-            else
-            {
-                $con_int = $global_con_2_int{$con_id};
-            }
-            $global_con_2_len{$con_int} = $fields[2];         
-        }
-        else
-        {
-            my @sam_fields = split(/\t/, $_);
-            my @mapping_flags = split(//, dec2bin($sam_fields[1]));
-            
-            # make sure it mapped
-            next if($mapping_flags[5] eq "1");
-            
-            # get a contig ID (int)
-            my $con_id = $sam_fields[2];
-            if(!exists $global_con_2_int{$con_id})
-            {
-                croak "Unknown contig ID: $con_id\n";
-            }
-            $con_id = $global_con_2_int{$con_id};
-            
-            # make sure it hit one of our contigs
-            if(exists $global_con_2_len{$con_id})
-            {
-                # make sure there's a container for our read ID
-                my $read_id = $sam_fields[0];
-                $read_id =~ s/_.$//;
-                $read_id =~ s/\.[rf]$//;
-                my $position = int($sam_fields[3]);
-                my $prob = int($sam_fields[4]);
-                if(!exists $global_reads_2_map{$read_id})
-                {
-                    my @tmp = ();
-                    $global_reads_2_map{$read_id} = \@tmp;
-                }
-                
-                # add it to the map
-                push @{$global_reads_2_map{$read_id}}, $con_id;
-                push @{$global_reads_2_map{$read_id}}, $position;
-                push @{$global_reads_2_map{$read_id}}, $prob;
-                if($sam_fields[1] eq '0')
-                {
-                    push @{$global_reads_2_map{$read_id}}, 0;   
-                }
-                elsif($sam_fields[1] eq '16')
-                {
-                    push @{$global_reads_2_map{$read_id}}, 1; 
-                }
-                else
-                {
-                    croak "We are expecting sam mapping flags to be either '16' or '0'\n";
-                }
-            }
-        }
+	chomp $_;
+	if($_ =~ /^@/)
+	{
+	    # work out and store contig lengths
+	    next if(1 != $first_sam);
+	    my @fields = split(/:/, $_);
+	    $fields[1] =~ s/\tLN//;
+	    my $con_id = $fields[1];
+	    my $con_int = 0;
+	    if(!exists $global_con_2_int{$con_id})
+	    {
+		$con_int = $global_conInt;
+		$global_conInt++;
+		$global_con_2_int{$con_id} = $con_int;
+		$global_int_2_con{$con_int} = $con_id;
+	    }
+	    else
+	    {
+		$con_int = $global_con_2_int{$con_id};
+	    }
+	    $global_con_2_len{$con_int} = $fields[2];         
+	}
+	else
+	{
+	    my @sam_fields = split(/\t/, $_);
+	    my @mapping_flags = split(//, dec2bin($sam_fields[1]));
+	    
+	    # make sure it mapped
+	    next if($mapping_flags[5] eq "1");
+	    
+	    # get a contig ID (int)
+	    my $con_id = $sam_fields[2];
+	    if(!exists $global_con_2_int{$con_id})
+	    {
+		croak "Unknown contig ID: $con_id\n";
+	    }
+	    $con_id = $global_con_2_int{$con_id};
+	    
+	    # make sure it hit one of our contigs
+	    if(exists $global_con_2_len{$con_id})
+	    {
+		# make sure there's a container for our read ID
+		my $read_id = $sam_fields[0];
+		$read_id =~ s/_.$//;
+		$read_id =~ s/\.[rf]$//;
+		my $position = int($sam_fields[3]);
+		my $prob = int($sam_fields[4]);
+		if(!exists $global_reads_2_map{$read_id})
+		{
+		    my @tmp = ();
+		    $global_reads_2_map{$read_id} = \@tmp;
+		}
+		
+		# add it to the map
+		push @{$global_reads_2_map{$read_id}}, $con_id;
+		push @{$global_reads_2_map{$read_id}}, $position;
+		push @{$global_reads_2_map{$read_id}}, $prob;
+		if($sam_fields[1] eq '0')
+		{
+		    push @{$global_reads_2_map{$read_id}}, 0;   
+		}
+		elsif($sam_fields[1] eq '16')
+		{
+		    push @{$global_reads_2_map{$read_id}}, 1; 
+		}
+		else
+		{
+		    croak "We are expecting sam mapping flags to be either '16' or '0'\n";
+		}
+	    }
+	}
     }
     $first_sam = 0;
     close $sam_fh;
 }
 
-
+print "Read ".scalar(keys %global_con_2_len)." contigs from the SAM files.\n";
 
 
 
@@ -199,37 +202,38 @@ foreach my $read_id (keys %global_reads_2_map)
     my @array = @{$global_reads_2_map{$read_id}};
     if($#array == 7)# if both ends mapped, and no chimeras detected
     {
-        $original_number_of_pairs += 1;
-        
-        my $contig1 = $array[0];
-        my $contig2 = $array[4];
-        my $position1 = $array[1];
-        my $position2 = $array[5];
-        my $direction1 = $array[3];
-        my $direction2 = $array[7];
-        my @key_parts = (
-                         $contig1.'_'.$position1.'_'.$direction1,
-                         $contig2.'_'.$position2.'_'.$direction2
-                         );
-        @key_parts = sort @key_parts; #sort so that prdering of the pairs is irrelevant
-        my $deduplication_key = $key_parts[0].'__'.$key_parts[1];
-        #print $deduplication_key."\n"; #debug
-        
-        # it is a duplicate if both ends map to the same positions in the same contigs
-        if(exists $already_mapped_contigs_positions{$deduplication_key}){
-            $number_of_duplicates_removed += 1;
-            print $pcr_duplicate_fh join("\t", ($contig1, $position1, $direction1, $contig2, $position2, $direction2))."\n";
-            delete $global_reads_2_map{$read_id};
-        } else {
-            # else this is the first time that it has been mapped
-            $already_mapped_contigs_positions{$deduplication_key} = 1;
-        }
+	$original_number_of_pairs += 1;
+	
+	my $contig1 = $array[0];
+	my $contig2 = $array[4];
+	my $position1 = $array[1];
+	my $position2 = $array[5];
+	my $direction1 = $array[3];
+	my $direction2 = $array[7];
+	my @key_parts = (
+			 $contig1.'_'.$position1.'_'.$direction1,
+			 $contig2.'_'.$position2.'_'.$direction2
+			 );
+	@key_parts = sort @key_parts; #sort so that prdering of the pairs is irrelevant
+	my $deduplication_key = $key_parts[0].'__'.$key_parts[1];
+	#print $deduplication_key."\n"; #debug
+	
+	# it is a duplicate if both ends map to the same positions in the same contigs
+	if(exists $already_mapped_contigs_positions{$deduplication_key}){
+	    $number_of_duplicates_removed += 1;
+	    print $pcr_duplicate_fh join("\t", ($contig1, $position1, $direction1, $contig2, $position2, $direction2))."\n";
+	    delete $global_reads_2_map{$read_id};
+	} else {
+	    # else this is the first time that it has been mapped
+	    $already_mapped_contigs_positions{$deduplication_key} = 1;
+	}
     }
 }
 my $number_after_deduplication = $original_number_of_pairs-$number_of_duplicates_removed;
 print "Removed $number_of_duplicates_removed PCR duplicates, leaving ".$number_after_deduplication." reads pairs with both ends mapped in \%global_reads_2_map.\n";
 my $percent_duplicate = ($number_of_duplicates_removed/$original_number_of_pairs)*100;
 print $percent_duplicate."% of sequences were PCR duplicates\n\n";
+close $pcr_duplicate_fh;
 
 
 
@@ -238,7 +242,7 @@ print $percent_duplicate."% of sequences were PCR duplicates\n\n";
 #=================================================================================================
 # now go through and make up the results files
 print "Determining insert size and orientation...\n";
-my $cum_diff = 0;       # stats holders
+      # stats holders
 my @diffs = ();
 my @type_array = ();
 $type_array[0] = 0;   # <--- --->
@@ -250,35 +254,34 @@ foreach my $read_id (keys %global_reads_2_map)
     my @array = @{$global_reads_2_map{$read_id}};
     if($#array == 7)
     {
-        # paired mapper
-        if($array[0] == $array[4])
-        {
-            # mapped onto self
-            my $diff = abs($array[1] - $array[5]);
-            push @diffs, $diff;
-            $cum_diff += $diff;
-            if($array[3] == $array[7])
-            {
-                $type_array[1]++;
-            }
-            else
-            {
-                if(($array[1] < $array[5]) ^ ($array[3] == 1))
-                {
-                    $type_array[2]++;
-                }
-                else
-                {
-                    $type_array[0]++;
-                }
-            }
-        }
+	# paired mapper
+	if($array[0] == $array[4])
+	{
+	    # mapped onto self
+	    my $diff = abs($array[1] - $array[5]);
+	    push @diffs, $diff;
+	    if($array[3] == $array[7])
+	    {
+		$type_array[1]++;
+	    }
+	    else
+	    {
+		if(($array[1] < $array[5]) ^ ($array[3] == 1))
+		{
+		    $type_array[2]++;
+		}
+		else
+		{
+		    $type_array[0]++;
+		}
+	    }
+	}
     }
 #    elsif($#array != 3)
 #    {
-        # something fishy happening with this hit
-        # we only want to keep the two most probably matches
-        # ignore for now
+	# something fishy happening with this hit
+	# we only want to keep the two most probably matches
+	# ignore for now
 #    }
 }
 
@@ -288,33 +291,65 @@ for my $i (0..2)
 {
     if($type_array[$i] > $type_array[$true_type])
     {
-        $true_type = $i;
+	$true_type = $i;
     }
 }
 
-my $mean = $cum_diff / (scalar @diffs);
-my $stdev = 0;
-for my $val (@diffs)
-{
-    $stdev += ($val - $mean)**2;
-}
-$stdev /= (scalar @diffs-1);
-$stdev = $stdev ** 0.5;
+# calculate the stdev on only the middle 80% of the sorted differences, otherwise it can be become very inflated. Can it still do this?
+@diffs = sort @diffs;
+my $length = scalar @diffs;
+my $bottom = int($length*0.1);
+my $top = int($length*0.9);
+croak "not enough data mapped to within contigs to determine insert size empirically" if $top-1 <= $bottom;
 
-print "Stats estimate:\n";
-print "Mean: $mean\nStdev: $stdev\n";
-print "Found $type_array[2] read pairs facing inwards on the same contig (type 2 read pairs). This is what you want for IonTorrent mate pair data.\n";
-print "Found $type_array[0] read pairs facing outwards on the same contig (type 0 read pairs). This is not what you want for mate pair data.\n";
-print "Found $type_array[1] read pairs facing the same direction on the same contig (type 1 read pairs). This is not what you want for IonTorrent mate pair data.\n";
-print "\nProceding using type $true_type as the expected mate pair type\n*****\n";
+my $cum_diff = 0.0;
+my $num_counted = 0;
+for my $index ($bottom..$top){
+    $cum_diff += $diffs[$index];
+    $num_counted += 1;
+}
+
+my $mean = $cum_diff / $num_counted;
+my $stdev = 0.0;
+for my $index ($bottom..$top)
+{
+    $stdev += ($diffs[$index] - $mean)**2;
+}
+$stdev /= ($num_counted-1);
+$stdev = $stdev ** 0.5;
 
 # we only care about reads which match the given type and
 # have an insert size comparable to the distribution
 # calculated above. ALSO...
 # use look up tables to save on if statements
 my $tol = 2;
-my $lower_limit = $mean - $stdev * $tol; 
+my $lower_limit = 0; #no need for this 
 my $upper_limit = $mean + $stdev * $tol; 
+
+print "Stats estimate:\n";
+print "Mean: $mean\nStdev: $stdev\n";
+print "Not accepting insert greater than $upper_limit or less than $lower_limit.\n";
+print "Found $type_array[2] read pairs facing inwards on the same contig (type 2 read pairs). This is what you want for IonTorrent mate pair data.\n";
+print "Found $type_array[0] read pairs facing outwards on the same contig (type 0 read pairs). This is not what you want for mate pair data.\n";
+print "Found $type_array[1] read pairs facing the same direction on the same contig (type 1 read pairs). This is not what you want for IonTorrent mate pair data.\n";
+print "\nProceding using type $true_type as the expected mate pair type\n*****\n";
+
+
+# Print out all the paired with their orientations, lengths and names etc.
+foreach my $read_id (keys %global_reads_2_map)
+{
+    # conID, pos, prob, strand
+    my @array = @{$global_reads_2_map{$read_id}};
+    
+    if($#array == 7){
+        my $contig1_name = $global_int_2_con{$array[0]};
+        my $contig2_name = $global_int_2_con{$array[4]};
+        
+        my $to_print = join "\t", ($contig1_name, $array[1], $array[2], $array[3], $contig2_name, $array[5], $array[6], $array[7]);
+	print $all_links_fh $to_print."\n";
+    }
+}
+close $all_links_fh;
 
 ##
 # KEYS:
@@ -412,9 +447,9 @@ foreach my $read_id (keys %global_reads_2_map)
     my @array = @{$global_reads_2_map{$read_id}};
     if($#array == 3)
     {
-        # single mapper
-        my $con_id = $global_int_2_con{$array[0]};
-        print $u_fh join("\t", ($con_id,$global_con_2_len{$array[0]},$read_id,$array[1],$array[3]))."\n";
+	# single mapper
+	my $con_id = $global_int_2_con{$array[0]};
+	print $u_fh join("\t", ($con_id,$global_con_2_len{$array[0]},$read_id,$array[1],$array[3]))."\n";
     }
     elsif($#array == 7)
     {
@@ -595,64 +630,64 @@ foreach my $con_id (keys %global_con_2_len)
 {
     if(exists $pre{$con_id})
     {
-        # something lies before this guy
-        # make a node for this contig... ...perhaps
-        makeGVNode($con_id);
-        # find the guys above the lower cutoff
-        my %valid_links = ();
-        my %tmp_hash = %{$pre{$con_id}};
-        foreach my $link (keys %tmp_hash)
-        {
-            if($tmp_hash{$link} >= $min_hits)
-            {
-                $valid_links{$link} = $tmp_hash{$link};
-            }
-        }
-        
-        # now make the edges
-        %tmp_hash = %{$pre_dist{$con_id}};
-        foreach my $link (keys %valid_links)
-        {
-            my $insert = 0;
-            my $num_ins = 0;
-            foreach my $ins (@{$tmp_hash{$link}})
-            {
-                $insert += $ins;
-                $num_ins++; 
-            }
-            $insert = int($insert/$num_ins); 
-            makeGVedge(\@orients, $con_id, $link, $insert,  $num_ins);
-            #print $global_int_2_con{$link} . "\t" . $global_con_2_len{$link}. "\t" . $insert . "\t" . $num_ins . "\n";
-        }
+	# something lies before this guy
+	# make a node for this contig... ...perhaps
+	makeGVNode($con_id);
+	# find the guys above the lower cutoff
+	my %valid_links = ();
+	my %tmp_hash = %{$pre{$con_id}};
+	foreach my $link (keys %tmp_hash)
+	{
+	    if($tmp_hash{$link} >= $min_hits)
+	    {
+		$valid_links{$link} = $tmp_hash{$link};
+	    }
+	}
+	
+	# now make the edges
+	%tmp_hash = %{$pre_dist{$con_id}};
+	foreach my $link (keys %valid_links)
+	{
+	    my $insert = 0;
+	    my $num_ins = 0;
+	    foreach my $ins (@{$tmp_hash{$link}})
+	    {
+		$insert += $ins;
+		$num_ins++; 
+	    }
+	    $insert = int($insert/$num_ins); 
+	    makeGVedge(\@orients, $con_id, $link, $insert,  $num_ins);
+	    #print $global_int_2_con{$link} . "\t" . $global_con_2_len{$link}. "\t" . $insert . "\t" . $num_ins . "\n";
+	}
     }
     
     if(exists $post{$con_id})
     {
-        # something lies after this guy
-        # make a node for this contig... ...perhaps
-        makeGVNode($con_id);
-        my %valid_links = ();
-        my %tmp_hash = %{$post{$con_id}};
-        foreach my $link (keys %tmp_hash)
-        {
-            if($tmp_hash{$link} >= $min_hits)
-            {
-                $valid_links{$link} = $tmp_hash{$link};
-            }
-        }
-        %tmp_hash = %{$post_dist{$con_id}};
-        foreach my $link (keys %valid_links)
-        {
-            my $insert = 0;
-            my $num_ins = 0;
-            foreach my $ins (@{$tmp_hash{$link}})
-            {
-                $insert += $ins;
-                $num_ins++; 
-            }
-            $insert = int($insert/$num_ins); 
-            makeGVedge(\@orients, $con_id, $link, $insert,  $num_ins);
-        }
+	# something lies after this guy
+	# make a node for this contig... ...perhaps
+	makeGVNode($con_id);
+	my %valid_links = ();
+	my %tmp_hash = %{$post{$con_id}};
+	foreach my $link (keys %tmp_hash)
+	{
+	    if($tmp_hash{$link} >= $min_hits)
+	    {
+		$valid_links{$link} = $tmp_hash{$link};
+	    }
+	}
+	%tmp_hash = %{$post_dist{$con_id}};
+	foreach my $link (keys %valid_links)
+	{
+	    my $insert = 0;
+	    my $num_ins = 0;
+	    foreach my $ins (@{$tmp_hash{$link}})
+	    {
+		$insert += $ins;
+		$num_ins++; 
+	    }
+	    $insert = int($insert/$num_ins); 
+	    makeGVedge(\@orients, $con_id, $link, $insert,  $num_ins);
+	}
     }
 }
 
@@ -681,9 +716,9 @@ sub incOrients
     my $key = 0;
     if($id_1 < $id_2) 
     {
-        $key = $id_2 * 10000000 + $id_1; 
-        if(0 == $orient) { $orient = 2; }
-        elsif(2 == $orient) { $orient = 0; }
+	$key = $id_2 * 10000000 + $id_1; 
+	if(0 == $orient) { $orient = 2; }
+	elsif(2 == $orient) { $orient = 0; }
     }
     else { $key = $id_1 * 10000000 + $id_2; }
     ${$oref}[$orient]{$key}++;
@@ -705,7 +740,7 @@ sub getOrient
     # we only want to return one copy of each edge
     if(exists $global_GV_seen_edges{$key})
     {
-        return -1;
+	return -1;
     }
     $global_GV_seen_edges{$key} = 1;
     
@@ -714,21 +749,21 @@ sub getOrient
     my $orient = 0;
     for my $i (0..3)
     {
-        if(exists ${$oref}[$i]{$key})
-        {
-            if(${$oref}[$i]{$key} > $max_orient_count) 
-            {
-                $max_orient_count = ${$oref}[$i]{$key}; 
-                $orient = $i; 
-            }
-        }
+	if(exists ${$oref}[$i]{$key})
+	{
+	    if(${$oref}[$i]{$key} > $max_orient_count) 
+	    {
+		$max_orient_count = ${$oref}[$i]{$key}; 
+		$orient = $i; 
+	    }
+	}
     }
     
     # fix any switching
     if(1 == $switch)
     {
-        if(0 == $orient) { $orient = 2; }
-        elsif(2 == $orient) { $orient = 0; }
+	if(0 == $orient) { $orient = 2; }
+	elsif(2 == $orient) { $orient = 0; }
     }
     return $orient;
 }
@@ -738,13 +773,13 @@ sub makeGVNode
     my ($con_id)  = @_;
     if(!exists $global_GV_nodes{$con_id})
     {
-        #
-        # JUST for this CLC data
-        #
-        my $pretty_name = $global_int_2_con{$con_id};
-        $pretty_name =~ s/pairedrawreadstrimmed\(paired\)//;
-        my $node_str  = "\t\"".$global_int_2_con{$con_id}."START\" -> \"".$global_int_2_con{$con_id}."END\" [ label = \"$pretty_name"."_$global_con_2_len{$con_id}\" style=\"setlinewidth(7)\"];\n";
-        $global_GV_nodes{$con_id} = $node_str;
+	#
+	# JUST for this CLC data
+	#
+	my $pretty_name = $global_int_2_con{$con_id};
+	$pretty_name =~ s/pairedrawreadstrimmed\(paired\)//;
+	my $node_str  = "\t\"".$global_int_2_con{$con_id}."START\" -> \"".$global_int_2_con{$con_id}."END\" [ label = \"$pretty_name"."_$global_con_2_len{$con_id}\" style=\"setlinewidth(7)\"];\n";
+	$global_GV_nodes{$con_id} = $node_str;
     }
 }
 
@@ -758,23 +793,23 @@ sub makeGVedge
     # return of -1 implies the edge is alreay seen
     if($orient == 0)
     {
-        my $edge_str = "\t\"".$global_int_2_con{$con_id}."END\" -> \"".$global_int_2_con{$link}."START\" [ label = \"".$insert."_".$num_ins."\"];\n"; 
-        push @global_GV_edges, $edge_str;
+	my $edge_str = "\t\"".$global_int_2_con{$con_id}."END\" -> \"".$global_int_2_con{$link}."START\" [ label = \"".$insert."_".$num_ins."\"];\n"; 
+	push @global_GV_edges, $edge_str;
     }
     elsif($orient == 1)
     {
-        my $edge_str = "\t\"".$global_int_2_con{$con_id}."END\" -> \"".$global_int_2_con{$link}."END\" [ label = \"".$insert."_".$num_ins."\"];\n";
-        push @global_GV_edges, $edge_str;
+	my $edge_str = "\t\"".$global_int_2_con{$con_id}."END\" -> \"".$global_int_2_con{$link}."END\" [ label = \"".$insert."_".$num_ins."\"];\n";
+	push @global_GV_edges, $edge_str;
     }
     elsif($orient == 2)
     {
-        my $edge_str = "\t\"".$global_int_2_con{$con_id}."START\" -> \"".$global_int_2_con{$link}."END\" [ label = \"".$insert."_".$num_ins."\"];\n";
-        push @global_GV_edges, $edge_str;
+	my $edge_str = "\t\"".$global_int_2_con{$con_id}."START\" -> \"".$global_int_2_con{$link}."END\" [ label = \"".$insert."_".$num_ins."\"];\n";
+	push @global_GV_edges, $edge_str;
     }
     elsif($orient == 3)
     {
-        my $edge_str = "\t\"".$global_int_2_con{$con_id}."START\" -> \"".$global_int_2_con{$link}."START\" [ label = \"".$insert."_".$num_ins."\"];\n";
-        push @global_GV_edges, $edge_str;
+	my $edge_str = "\t\"".$global_int_2_con{$con_id}."START\" -> \"".$global_int_2_con{$link}."START\" [ label = \"".$insert."_".$num_ins."\"];\n";
+	push @global_GV_edges, $edge_str;
     }
 }
 
@@ -839,7 +874,7 @@ sub overrideDefault
     my ($default_value, $option_name) = @_;
     if(exists $global_options->{$option_name})
     {
-        return $global_options->{$option_name};
+	return $global_options->{$option_name};
     }
     return $default_value;
 }
@@ -877,7 +912,7 @@ sub checkFileExists {
     #
     my ($file) = @_;
     unless(-e $file) {
-        croak "**ERROR: $0 : Cannot find:\n$file\n";
+	croak "**ERROR: $0 : Cannot find:\n$file\n";
     }
 }
 
@@ -887,7 +922,7 @@ sub logExternalCommand
     # Log a command line command to the command line!
     #
     if(1 == $global_log_commands) {
-        print $_[0], "\n";
+	print $_[0], "\n";
     }
 }
 
@@ -898,7 +933,7 @@ sub isCommandInPath
     #
     my ($cmd, $failure_type) = @_;
     if (system("which $cmd |> /dev/null")) {
-        handleCommandFailure($cmd, $failure_type);
+	handleCommandFailure($cmd, $failure_type);
     }
 }
 
@@ -930,7 +965,7 @@ sub checkAndRunCommand
 
     # make sure that all went well
     if (system($cmd_str)) {
-         handleCommandFailure($cmd_str, $failure_type)
+	 handleCommandFailure($cmd_str, $failure_type)
     }
 }
 
@@ -943,12 +978,12 @@ sub formatParams {
     my $ref = shift;
     
     if (ref($ref) eq "ARRAY") {
-        return join(" ", @{$ref});
+	return join(" ", @{$ref});
     } elsif (ref($ref) eq "HASH") {
-        return join(" ", map { $_ . " " . $ref->{$_}} keys %{$ref});
+	return join(" ", map { $_ . " " . $ref->{$_}} keys %{$ref});
     }
     croak 'The elements of the $params argument in checkAndRunCommand can ' .
-        'only contain references to arrays or hashes\n';
+	'only contain references to arrays or hashes\n';
 }
 
 
@@ -958,11 +993,11 @@ sub handleCommandFailure {
     #
     my ($cmd, $failure_type) = @_;
     if (defined($failure_type)) {
-        if ($failure_type == DIE_ON_FAILURE) {
-            croak "**ERROR: $0 : " . $! . "\n";
-        } elsif ($failure_type == WARN_ON_FAILURE) {
-            carp "**WARNING: $0 : " . $! . "\n";
-        }
+	if ($failure_type == DIE_ON_FAILURE) {
+	    croak "**ERROR: $0 : " . $! . "\n";
+	} elsif ($failure_type == WARN_ON_FAILURE) {
+	    carp "**WARNING: $0 : " . $! . "\n";
+	}
     }
 }
 
@@ -1013,17 +1048,17 @@ __Script__Name__
 
     ionPairer.pl -sam1|1 SAMFILE1 -sam2|2 SAMFILE2
 
-        -sam1 -1 SAMFILE1               Sam file of forward read
-        -sam2 -2 SAMFILE2               Sam file of reverse read
-        [-working_dir -w]               Somewhere to write all the files
+	-sam1 -1 SAMFILE1               Sam file of forward read
+	-sam2 -2 SAMFILE2               Sam file of reverse read
+	[-working_dir -w]               Somewhere to write all the files
 
     Produces output files:
     
-         SAMFILE1.links.csv       - Reads which link two contigs
-         SAMFILE1.paired.csv      - Reads where both ends mapped onto one contig
-         SAMFILE1.lerror.csv      - Reads which link two contigs, but erroneously
-         SAMFILE1.perror.csv      - Reads where both ends mapped, but erroneously
-         SAMFILE1.lamb.csv        - Ambiguous links
-         SAMFILE1.unpaired.csv    - Reads where only one end mapped
-         SAMFILE1.summary.gv      - Graphviz file for visualising the links
+	 SAMFILE1.links.csv       - Reads which link two contigs
+	 SAMFILE1.paired.csv      - Reads where both ends mapped onto one contig
+	 SAMFILE1.lerror.csv      - Reads which link two contigs, but erroneously
+	 SAMFILE1.perror.csv      - Reads where both ends mapped, but erroneously
+	 SAMFILE1.lamb.csv        - Ambiguous links
+	 SAMFILE1.unpaired.csv    - Reads where only one end mapped
+	 SAMFILE1.summary.gv      - Graphviz file for visualising the links
 =cut
