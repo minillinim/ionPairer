@@ -276,7 +276,7 @@ if __FILE__ == $0 #needs to be removed if this script is distributed as part of 
   # read in the linkage file
   contig_linkset = ContigLinkSet.new
   ignored_as_the_same_contig = 0
-  CSV.open(options[:linkage_file], :col_sep => "\t").each do |row|
+  CSV.open(options[:linkage_file], :col_sep => "\t", :headers => true).each do |row|
     # contig1_name  position1  mapping_quality1  direction1  contig2_name  position2  mapping_quality2  direction2
     #70	25937	149	1	70	24818	17	0
     #54	32081	20	1	54	29539	142	0

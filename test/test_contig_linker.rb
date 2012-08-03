@@ -162,6 +162,7 @@ describe 'the script' do
 
     # Create a dummy input file
     input = [
+      'h1 h2 h3 h4 h5 h6 h7 h8',
       "contig1	25937	149	0	contig2	23	17	1",
       "contig1	25941	20	0	contig2	54	142	1",
       "contig3	8990	9	1	contig4	7389	153	0",
