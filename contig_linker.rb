@@ -16,6 +16,10 @@ class ContigLink
   attr_accessor :position1, :position2,
     :direction1, :direction2
     
+  def log
+    Bio::Log::LoggerPlus['contig_linker']
+  end
+    
   # Determine ends that the links are. They must be
   # * within the max_distance from the ends of the contig
   # * have consistent direction i.e. can't be pointing towards the inside of the contig, must be pointing out
@@ -60,6 +64,26 @@ class ContigLink
       end
     end
   end
+  
+  # Given 2 contig lengths, and the joining between those contigs, estimate how many Ns are needed between them
+  # Simply mean - distance_from_contig1_end - distance_from_contig2_end
+  def estimate_distance_between_contigs(contig_lengths, contig_ends, mean_insert_size)
+    compute_distance = lambda do |position, contig_length, contig_end|
+      distance_from_end = nil
+      if contig_end==START_OF_CONTIG
+        distance_from_end = position
+      elsif contig_end==END_OF_CONTIG
+        distance_from_end = contig_length-position
+      else
+        raise "programming error"
+      end
+      distance_from_end
+    end
+    
+    distance_from_end1 = compute_distance.call(@position1, contig_lengths[0], contig_ends[0])
+    distance_from_end2 = compute_distance.call(@position2, contig_lengths[1], contig_ends[1])
+    return mean_insert_size-distance_from_end1-distance_from_end2
+  end
 end
 
 # A hash of [contig_name1, contig_name2] => Array of ContigLink's.
@@ -91,9 +115,12 @@ class ContigLinkSet < Hash
   end
   
   # options:
+  # :mean_insert_size: mean insert size, to estimate amount of sequence between contig lengths [required]
   # :min_links: minimum number of links to bother drawing on the graph [default 3]
   def generate_graphviz(max_distance, options = {})
     options[:min_links] ||= 3
+    raise unless options[:mean_insert_size]
+    raise unless options[:contig_lengths]
     
     # create initial graphviz nodes
     # each contig is 2 nodes - one for the start and one for the end
@@ -103,12 +130,13 @@ class ContigLinkSet < Hash
     graphviz = GraphViz.new(:G, :type => :graph)
     graphviz.node_attrs[:shape] = :point
     
+    # Create contig start/end nodes and add edges between the start and the end
     @contig_lengths.each do |contig, length|
       start_name = get_start_node_name.call(contig)
       stop_name = get_end_node_name.call(contig)
       graphviz.add_nodes(start_name)
       graphviz.add_nodes(stop_name)
-      color='blue'
+      color = 'blue'
       color = 'grey' if length < max_distance*2
       graphviz.add_edges(start_name, stop_name, :style => "setlinewidth(4)", :label => contig, :color => color)
     end
@@ -168,22 +196,23 @@ class ContigLinkSet < Hash
         log.debug "Not creating a the link between #{contig1} and #{contig2}, as there was no passable links"
         next
       end
-  
+      
+      # Remove those with insufficient links
+      max = sorts[0]
+      unless max[1] >= options[:min_links]
+        log.debug "Not putting in linkage between #{contig1} and #{contig2}, as there was insufficient links (#{max[1]} found)"
+        next
+      end
+      
       # look for tied winners, don't put these as links in the graphviz
       if sorts[0][1]==sorts[1][1]
-        log.warn "Contig link #{contig1} and #{contig2} have confusing orientation statistics, not putting into the graphviz file"
+        log.warn "Contig link #{contig1} and #{contig2} have confusing orientation statistics (#{sorts.inspect}), not putting into the graphviz file"
         next
       end
       
       # create a new edge between the appropriate sides.
-      max = sorts[0]
       if sorts.length > 1
-        if max[1] >= options[:min_links]
-          log.debug "Assigning the link between #{contig1} and #{contig2}, as max #{max[1]}, second one #{sorts[1][1]}"
-        else
-          log.debug "Not putting in linkage between #{contig1} and #{contig2}, as there was insufficient links (#{max[1]} found)"
-          next
-        end
+        log.debug "Assigning the link between #{contig1} and #{contig2}, as max #{max[1]}, second one #{sorts[1][1]}"
       else
         log.debug "Assigning the link between #{contig1} and #{contig2}, as max #{max[1]}, that was the only link type detected"
       end
@@ -193,8 +222,6 @@ class ContigLinkSet < Hash
           from_node = get_start_node_name.call(contig_name)
         elsif ending == ContigLink::END_OF_CONTIG
           from_node = get_end_node_name.call(contig_name)
-        #elsif [ContigLink::INCONSISTENT_POSITION_AND_DISTANCE, ContigLink::NOT_NEAR_EITHER_END].include?(ending)
-        #  # do nothing, don't add these to the graph
         else
           raise "programming error"
         end
@@ -237,6 +264,10 @@ if __FILE__ == $0 #needs to be removed if this script is distributed as part of 
     opts.on("-f", "--reference-fasta-file PATH", "fasta file of reference sequences mapped to the sam file [required]") do |arg|
       options[:reference_fasta_file] = arg
     end
+    opts.on("-u", "--mean MEAN_INSERT_LENGTH", "Average insert size, to estimate amount of sequence in contig joins [required]") do |arg|
+      options[:mean_insert_size] = arg.to_i
+      raise unless options[:mean_insert_size] >= 0
+    end
     opts.on("-m", "--max-distance ARG", "I'm looking for pairs that map near the ends of contigs. How far is too far from the end, in base pairs? [default #{options[:max_distance]}]") do |arg|
       options[:max_distance] = arg.to_i
       raise unless options[:max_distance] > 0
@@ -252,7 +283,7 @@ if __FILE__ == $0 #needs to be removed if this script is distributed as part of 
     opts.on("--trace options",String,"Set log level [default INFO]. e.g. '--trace debug' to set logging level to DEBUG"){|s| Bio::Log::CLI.trace(s)}
   end
   o.parse!
-  if ARGV.length != 0 or options[:linkage_file].nil? or options[:reference_fasta_file].nil?
+  if ARGV.length != 0 or options[:linkage_file].nil? or options[:reference_fasta_file].nil? or options[:mean_insert_size].nil?
     $stderr.puts o
     exit 1
   end
@@ -314,7 +345,7 @@ if __FILE__ == $0 #needs to be removed if this script is distributed as part of 
   log.info "Read in linkages between #{contig_linkset.length} pairs of contigs. For instance between #{eg_key[0]} and #{eg_key[1]} there are #{eg.length} links"
   
   contig_linkset.contig_lengths = contig_lengths
-  graphviz = contig_linkset.generate_graphviz(options[:max_distance], :min_links => options[:min_links])
+  graphviz = contig_linkset.generate_graphviz(options[:max_distance], {:min_links => options[:min_links], :mean_insert_size => options[:mean_insert_size]})
   
   # print outputs
   graphviz.output :dot => "#{options[:linkage_file]}.dot"
