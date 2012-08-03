@@ -72,9 +72,10 @@ unless(-e $global_working_dir or mkdir $global_working_dir) {
 my %global_con_2_int = ();         # contigIDs to integers
 my %global_int_2_con = ();         # integers to contigIDs
 my $global_conInt = 1;             # UID
-my %global_con_2_len = ();         # contig integerss versus lengths
+my %global_con_2_len = ();         # contig integers versus lengths
 my %global_reads_2_map = ();       # reads vs mapping info
 my $global_minimum_links = overrideDefault(3, 'min_links'); # minimum number of links accepted during graph creation
+my $reference_fasta = $global_options->{'reference_fasta'};
 
 # get output file names and handles
 my ($file_root, undef, undef) = fileparse($global_options->{'sam1'});
@@ -416,7 +417,7 @@ foreach my $read_id (keys %global_reads_2_map)
             my $to_print = join "\t", ($contig1_name, $array[1], $array[2], $array[3], $contig2_name, $array[5], $array[6], $array[7]);
             print $all_links_fh $to_print."\n";
             # work out whether the reads map in the right way
-            if(($contig1_length < 2*$upper_limit) or ($contig2_length < 2*$upper_limit))
+            if(($contig1_length < $mean) or ($contig2_length < $mean))
             {
                 # one contig or another is too short.
                 if ($contig1_length < $contig2_length)
@@ -484,6 +485,17 @@ close $error_paired_fh;
 close $short_links_fh;
 close $all_links_fh;
 
+# Call the ruby script that does the creation of the graphviz file
+
+my $path_to_contig_linker = File::Spec->catfile(dirname($0), 'contig_linker.rb');
+checkAndRunCommand($path_to_contig_linker, [{
+                                 -l => $all_links_file,
+                                 -L => $global_minimum_links,
+                                 -m => $upper_limit,
+                                 -f => $reference_fasta,
+                                 "--trace" => 'info',
+                                 }], DIE_ON_FAILURE);
+
 ######################################################################
 # CUSTOM SUBS
 ######################################################################
@@ -506,7 +518,7 @@ sub checkParams {
     #-----
     # Do any and all options checking here...
     #
-    my @standard_options = ("sam1|1:s", "sam2|2:s", "working_dir|w:s", "help|h+", "max_insert|m:i", "min_links|l:i");
+    my @standard_options = ("sam1|1:s", "sam2|2:s", "reference_fasta|f:s", "working_dir|w:s", "help|h+", "max_insert|m:i", "min_links|l:i");
     my %options;
 
     # Add any other command line options, and the code to handle them
@@ -527,6 +539,7 @@ sub checkParams {
     # Compulsory items
     if(!(exists $options{'sam1'})) { printParamError ("No forward SAM file supplied."); }
     if(!(exists $options{'sam2'})) { printParamError ("No reverse SAM file supplied."); }
+    if(!(exists $options{'reference_fasta'})) { printParamError ("No reference fasta file supplied."); }
 
     return \%options;
 }
@@ -720,13 +733,14 @@ __Script__Name__
 
 =head1 SYNOPSIS
 
-    ionPairer.pl -sam1|1 SAMFILE1 -sam2|2 SAMFILE2
+    ionPairer.pl -sam1|1 SAMFILE1 -sam2|2 SAMFILE2 -reference_fasta|f REFERENCE_FASTA
 
-	-sam1 -1 SAMFILE1               Sam file of forward read
-	-sam2 -2 SAMFILE2               Sam file of reverse read
-	[-working_dir -w]               Somewhere to write all the files
-	[-min_links -l]                 Minimum number of links to report in the dot file [default: 3]
-	[-max_insert -m]                Maximum insert size accepted [default: mean + 2 * std measured empirically (middle 80% paired reads)]
+	-sam1 -1 SAMFILE1                    Sam file of forward read
+	-sam2 -2 SAMFILE2                    Sam file of reverse read
+        -reference_fasta -f REFERENCE_FASTA  Fasta file of sequences to be scaffolded (used during creation of sam files)
+	[-working_dir -w]                    Somewhere to write all the files
+	[-min_links -l]                      Minimum number of links to report in the dot file [default: 3]
+	[-max_insert -m]                     Maximum insert size accepted [default: mean + 2 * std measured empirically (middle 80% paired reads)]
 
     Produces output files:
     
