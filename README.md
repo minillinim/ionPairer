@@ -81,11 +81,11 @@ agree with that linking.
 To modify the scaffolds, modify the ```dot``` file (maybe best to also copy it to a new file ```forward_matesVmy_assembly.sam.all_links.manually_modified.dot```). For instance if this link is no good, for whatever reason:
 
 ```
-contig00056END -- contig00073START [label="3links", pos="4787.7,441 4818.5,441.05 5258.1,441.41 5311,422 5336,412.81 5358.4,386.6 5362.4,381.77", lp="5355.5,414"];
+contig00056END -- contig00073START [label="3links", ...
 ```
 Then simply comment it out:
 ```
-#contig00056END -- contig00073START [label="3links", pos="4787.7,441 4818.5,441.05 5258.1,441.41 5311,422 5336,412.81 5358.4,386.6 5362.4,381.77", lp="5355.5,414"];
+#contig00056END -- contig00073START [label="3links", ...
 ```
 and rerun graphviz, which will make a new png/svg file for you, like so
 ```sh
@@ -95,7 +95,7 @@ $ neato -Tpng forward_matesVmy_assembly.sam.all_links.manually_modified.dot >for
 
 ## Once you are happy with the manual assembly and want to do the actual scaffolding
 Once the ```.dot``` file has been editted to your satisfaction, 
-use ```scaffolder.pl`` script to create the scaffolds. This script will orient the contigs (forward or reverse complement) and scaffold 
+use ```scaffolder.pl``` script to create the scaffolds. This script will orient the contigs (forward or reverse complement) and scaffold 
 the contigs with an arbitrary 25 Ns between each contig.
 
 
