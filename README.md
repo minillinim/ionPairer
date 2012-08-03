@@ -1,5 +1,4 @@
 
-
      d8b                   8888888b.          d8b                         
      Y8P                   888   Y88b         Y8P                         
                            888    888                                     
@@ -58,17 +57,18 @@ $ ionPairer.pl -sam1 forward_matesVmy_assembly.sam -sam2 reverse_matesVmy_assemb
 
 In that output directory ```ion_pairer_outputs``` there should be the following files:
 
-* ```forward_matesVmy_assembly.sam.links.csv``` Reads which link two contigs
-* ```forward_matesVmy_assembly.sam.paired.csv``` Reads where both ends mapped onto one contig
-* ```forward_matesVmy_assembly.sam.lerror.csv``` Reads which link two contigs, but erroneously
-* ```forward_matesVmy_assembly.sam.perror.csv``` Reads where both ends mapped, but erroneously
-* ```forward_matesVmy_assembly.sam.unpaired.csv``` Reads where only one end mapped
+* ```forward_matesVmy_assembly.sam.unpaired.csv``` Reads where only one end mapped to a contig
 * ```forward_matesVmy_assembly.sam.pcr_duplicates.csv``` Reads removed from further analysis as they were judged to be PCR duplicates
-* ```forward_matesVmy_assembly.sam.unique_links.csv``` All pairs of mate pairs that span between two contigs, after the pcr duplicates have been removed
+* ```forward_matesVmy_assembly.sam.paired.csv``` Reads where both ends mapped onto one contig
+* ```forward_matesVmy_assembly.sam.error_paired.csv``` Reads where both ends mapped, but erroneously due to insert size or relative orientation
+* ```forward_matesVmy_assembly.sam.unique_links.csv``` All pairs of mate pairs that span between two contigsand pass the pcr filter  
+* ```forward_matesVmy_assembly.sam.short_links.csv``` Pairs where one of the contigs was shorter than the insert size
+* ```forward_matesVmy_assembly.sam.error_links.csv``` Pairs which link two contigs, but erroneously due to insert size, position or relative orientation
+* ```forward_matesVmy_assembly.sam.filtered_links.csv``` Subset of unique pairs which are neither short nor erroneous
 
 There'll also be three graphviz-related files:
 
-* ```forward_matesVmy_assembly.sam.unique_links.dot``` the dot file used to specify the links between contigs
+* ```forward_matesVmy_assembly.sam.unique_links.dot``` The dot file used to specify the links between contigs
 * ```forward_matesVmy_assembly.sam.unique_links.png``` A png picture representation of the dot file. The colours are meaningful. Specifically red contigs are longer than 2x 
 * ```forward_matesVmy_assembly.sam.unique_links.svg``` An svg picture representation of the dot file
 
