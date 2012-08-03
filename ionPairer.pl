@@ -385,13 +385,10 @@ foreach my $read_id (keys %global_reads_2_map)
         my $contig2_name = $global_int_2_con{$array[4]};
         my $contig2_length = $global_con_2_len{$array[4]}; 
         
-        my $to_print = join "\t", ($contig1_name, $array[1], $array[2], $array[3], $contig2_name, $array[5], $array[6], $array[7]);
-        print $all_links_fh $to_print."\n";
-        
         if($contig1_name eq $contig2_name)
         {
             # mapped onto self
-            my $pair_print - join("\t", ($contig1_name,$contig1_length,$read_id,$array[1],$array[3],$array[5],$array[7]));
+            my $pair_print = join("\t", ($contig1_name,$contig1_length,$read_id,$array[1],$array[3],$array[5],$array[7]));
             if(($array[1] < $array[5]) ^ ($array[3] == 1) ^ ($true_type == 0))
             {
                 # seems OK, check the insert
@@ -399,7 +396,7 @@ foreach my $read_id (keys %global_reads_2_map)
                 if(($diff > $lower_limit) and ($diff < $upper_limit))
                 {
                     # all good
-                    print $paired_fh ."\n";
+                    print $paired_fh $pair_print."\n";
                 }
                 else
                 {
@@ -416,6 +413,8 @@ foreach my $read_id (keys %global_reads_2_map)
         else
         {
             # possible linker
+            my $to_print = join "\t", ($contig1_name, $array[1], $array[2], $array[3], $contig2_name, $array[5], $array[6], $array[7]);
+            print $all_links_fh $to_print."\n";
             # work out whether the reads map in the right way
             if(($contig1_length < 2*$upper_limit) or ($contig2_length < 2*$upper_limit))
             {
@@ -448,7 +447,8 @@ foreach my $read_id (keys %global_reads_2_map)
                 else
                 {
                     # read one lies too far into the contig
-                    print $error_links_fh $link_print."\t1\n";
+                    $link_print .= "\t1\n";
+                    print $error_links_fh $link_print;
                     next;
                 }
                 
@@ -457,7 +457,8 @@ foreach my $read_id (keys %global_reads_2_map)
                 else
                 {
                     # read two lies too far into the contig
-                    print $error_links_fh $link_print."\t2\n";
+                    $link_print .= "\t2\n";
+                    print $error_links_fh $link_print;
                     next;
                 }
                 my $index_key = join("", @key);
