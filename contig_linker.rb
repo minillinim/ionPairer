@@ -3,9 +3,17 @@
 require 'optparse'
 require 'bio-logger'
 require 'graphviz'
-require 'csv'
 require 'bio'
 require 'pp'
+require 'csv'
+# Use a different CSV parser for Ruby 1.8 than 1.9+
+if CSV.const_defined? :Reader
+  require 'fastercsv'
+  csv = FasterCSV
+else
+  csv = CSV
+end
+
 
 class ContigLink
   START_OF_CONTIG = 'contig_start'
@@ -276,7 +284,7 @@ if __FILE__ == $0 #needs to be removed if this script is distributed as part of 
   # read in the linkage file
   contig_linkset = ContigLinkSet.new
   ignored_as_the_same_contig = 0
-  CSV.open(options[:linkage_file], :col_sep => "\t").each do |row|
+  csv.open(options[:linkage_file], :col_sep => "\t").each do |row|
     # contig1_name  position1  mapping_quality1  direction1  contig2_name  position2  mapping_quality2  direction2
     #70	25937	149	1	70	24818	17	0
     #54	32081	20	1	54	29539	142	0
@@ -305,7 +313,7 @@ if __FILE__ == $0 #needs to be removed if this script is distributed as part of 
   
       contig_linkset.add_contig_set(
         row[0], row[1], row[3],
-        row[4], row[5], row[7],
+        row[4], row[5], row[7]
       )
     end
   end
