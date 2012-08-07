@@ -19,7 +19,7 @@ path_to_script = File.join(File.dirname(__FILE__),'..',script_under_test)
 log_name = File.basename(script_under_test,'.rb')
 Bio::Log::LoggerPlus.new(log_name)
 Bio::Log::CLI.logger('stderr')
-Bio::Log::CLI.configure(log_name) # when commented out no debug is printed out
+#Bio::Log::CLI.configure(log_name) # when commented out no debug is printed out
 
 describe 'ContigLink' do
   it 'should predict_link_direction on longer contigs' do
@@ -63,8 +63,8 @@ describe 'ContigLink' do
     link.direction1 = '-'
     link.direction2 = '+'
     #def estimate_distance_between_contigs(contig_lengths, contig_ends, mean_insert_size)
-    link.estimate_distance_between_contigs([500,600], 2000).should eq(2000-400-10)
-    link.estimate_distance_between_contigs([500,600], 2000).should eq(2000-10-(600-400))
+    link.estimate_distance_between_contigs([500,600], [ContigLink::START_OF_CONTIG, ContigLink::START_OF_CONTIG], 2000).should eq(2000-400-10)
+    link.estimate_distance_between_contigs([500,600], [ContigLink::START_OF_CONTIG, ContigLink::END_OF_CONTIG], 2000).should eq(2000-10-(600-400))
   end
 end
 
@@ -90,6 +90,68 @@ describe 'ContigLinkageSet' do
       [link1, link2]
     )
   end
+  
+  it 'should predict_best_abutting' do
+    set = ContigLinkageSet.new
+    set.contig1_length = 30
+    set.contig2_length = 100
+
+    link1 = ContigLink.new
+    link1.position1 = 30
+    link1.position2 = 80
+    link1.direction1 = '-'
+    link1.direction2 = '+'
+    link2 = ContigLink.new
+    link2.position1 = 20
+    link2.position2 = 80
+    link2.direction1 = '-'
+    link2.direction2 = '+'
+    link3 = ContigLink.new
+    link3.position1 = 20
+    link3.position2 = 80
+    link3.direction1 = '+' #this is what is different to link2
+    link3.direction2 = '+'
+    set.links = [link1, link2, link3]
+    abutting1, abutting2, abutting_links = set.predict_best_abutting(50)
+    abutting1.should eq(ContigLink::START_OF_CONTIG)
+    abutting2.should eq(ContigLink::END_OF_CONTIG)
+    abutting_links.should eq([link1, link2])
+  end
+  
+  it 'should predict correct insert size' do
+    # self.distance_between_contigs(contig_lengths, abuttings, abutting_links, mean_insert_size)
+    #set.contig1_length = 30
+    #set.contig2_length = 100
+    #
+    link1 = ContigLink.new
+    link1.position1 = 30 #=> 30
+    link1.position2 = 80 #=> 20
+    link1.direction1 = '-'
+    link1.direction2 = '+'
+    link2 = ContigLink.new
+    link2.position1 = 20 #=> 20
+    link2.position2 = 80 #=> 20
+    link2.direction1 = '-'
+    link2.direction2 = '+'
+    #set.links = [link1, link2]
+    #set.classified_abuttings_hash(50).should eq(
+    #  [ContigLink::START_OF_CONTIG, ContigLink::END_OF_CONTIG] =>
+    #  [link1, link2]
+    #)
+    ContigLinkageSet.distance_between_contigs(
+      [30, 100],
+      [ContigLink::START_OF_CONTIG, ContigLink::END_OF_CONTIG],
+      [link1, link2],
+      1000
+    ).should eq(1000-(50+40)/2)
+    
+    ContigLinkageSet.distance_between_contigs(
+      [30, 100],
+      [ContigLink::START_OF_CONTIG, ContigLink::END_OF_CONTIG],
+      [link1, link2],
+      100
+    ).should eq(100-(50+40)/2)
+  end
 end
 
 describe 'ContigLinkSet' do
@@ -110,9 +172,9 @@ describe 'ContigLinkSet' do
     set.length.should eq(0)
     set.add_contig_set('contig2', 2500, '-', 'contig1', 100, '+')
     set.add_contig_set('contig2', 2501, '-', 'contig1', 10, '+')
+    #set.add_contig_set('contig2', 2501, '+', 'contig1', 10, '+')
     set.contig_lengths = {'contig1' => 1000, 'contig2' => 3000}
-    graph = set.generate_graphviz(54000, :min_links => 0)
-    
+    graph = set.generate_graphviz(54000, :min_links => 0, :mean_insert_size => 2000)
     graph.node_count.should eq(4)
     graph.edge_count.should eq(3)
     expecteds = {
@@ -135,7 +197,7 @@ describe 'ContigLinkSet' do
     set.add_contig_set('contig2', 2501, '-', 'contig1', 10, '+')
     set.add_contig_set('contig3', 288, '+', 'contig4', 10, '-')
     set.contig_lengths = {'contig1' => 1000, 'contig2' => 3000, 'contig3' => 300, 'contig4' => 400}
-    graph = set.generate_graphviz(54000, :min_links => 0)
+    graph = set.generate_graphviz(54000, :min_links => 0, :mean_insert_size => 2000)
     
     graph.node_count.should eq(8)
     graph.edge_count.should eq(6)
@@ -160,7 +222,7 @@ describe 'ContigLinkSet' do
     set.length.should eq(0)
     set.add_contig_set('contig2', 2500, '-', 'contig1', 100, '+')
     set.contig_lengths = {'contig1' => 1000, 'contig2' => 3000}
-    graph = set.generate_graphviz(10, :min_links => 0) #set the max distance to something impossible for testing purposes
+    graph = set.generate_graphviz(10, :min_links => 0, :mean_insert_size => 2000) #set the max distance to something impossible for testing purposes
     
     graph.node_count.should eq(4)
     graph.edge_count.should eq(2)
@@ -181,9 +243,9 @@ describe 'ContigLinkSet' do
     set.length.should eq(0)
     set.add_contig_set('contig2', 2500, '-', 'contig1', 100, '+')
     set.contig_lengths = {'contig1' => 1000, 'contig2' => 3000}
-    graph = set.generate_graphviz(54000, :min_links => 1).edge_count.should eq(3)
-    graph = set.generate_graphviz(54000, :min_links => 2).edge_count.should eq(2)
-    graph = set.generate_graphviz(54000).edge_count.should eq(2)
+    graph = set.generate_graphviz(54000, :min_links => 1, :mean_insert_size => 2000).edge_count.should eq(3)
+    graph = set.generate_graphviz(54000, :min_links => 2, :mean_insert_size => 2000).edge_count.should eq(2)
+    graph = set.generate_graphviz(54000, :mean_insert_size => 2000).edge_count.should eq(2)
   end
 end
 
@@ -238,11 +300,14 @@ describe 'the script' do
           fasta_file.path,
           '-L',
           '0',
+          '-q',
+          '-u',
+          '2000',
         ]
         res = `#{command.join(' ')} 2>error`
         res.should eq("")
         err = File.open('error').readlines
-        err.length.should be > 10, "error was #{err}" #there should be debug info printed - bit of a loose test, I know
+        err.length.should eq(0), "error was #{err}"
       end
     end
     

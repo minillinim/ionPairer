@@ -494,6 +494,7 @@ checkAndRunCommand($path_to_contig_linker, [{
                                  -m => $upper_limit,
                                  -f => $reference_fasta,
                                  "--trace" => 'info',
+                                 -u => $upper_limit
                                  }], DIE_ON_FAILURE);
 
 ######################################################################

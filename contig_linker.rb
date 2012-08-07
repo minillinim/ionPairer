@@ -109,10 +109,8 @@ class ContigLinkageSet
     @links.each do |link|
       # near the start and correct direction for the first contig?
       # which end is it near
-      contig_length1 = @contig_lengths[contig1]
-      contig_length2 = @contig_lengths[contig2]
-      if contig_length1.nil?
-        raise "Unexpected lack of @contig_lengths[#{contig1}] or @contig_lengths[#{contig2}]"
+      if @contig1_length.nil?
+        raise "Unexpected lack of @contig1_length"
       end
       closest_ends = link.predict_link_ends(max_distance, @contig1_length, @contig2_length)
       
@@ -120,11 +118,12 @@ class ContigLinkageSet
       end_identifier_hash[key] ||= []
       end_identifier_hash[key].push link
     end
-    return
+    return end_identifier_hash
   end
   
   # Work out the maximal direction of the linking - i.e. which ends should be joined.
-  # Return nil if there is no winner
+  # Return abutting1, abutting2, links
+  # nil if there is no winner
   def predict_best_abutting(max_distance)
     # classify each link as start to start, etc.
     end_identifier_hash = classified_abuttings_hash(max_distance)
@@ -140,25 +139,26 @@ class ContigLinkageSet
     end
     
     # sort the possibilities in reverse order
-    sorts = counts.to_a.sort{|a,b| -(a[1].length<=>b[1].length)}
-    log.debug "After sorting, got sorted pairs #{sorts.inspect} for #{contig1} and #{contig2}"
+    sorts = end_identifier_hash.to_a.sort{|a,b| -(a[1].length<=>b[1].length)}
+    log.debug "After sorting, got sorted pairs #{sorts.inspect} for #{@contig1_name} and #{@contig2_name}"
     
     return nil if sorts.length == 0
     
     # look for tied winners to be anal, return no links if this is the case
-    if sorts[0][1]==sorts[1][1] and
-      log.warn "Contig link #{@contig1_name} and #{@contig2_name} have confusing orientation statistics (#{sorts.inspect}), not putting into the graphviz file"
+    if sorts.length > 1 and sorts[0][1].length==sorts[1][1].length and
+      log.warn "Contig link #{@contig1_name} and #{@contig2_name} have confusing orientation statistics (#{sorts.inspect}), ignoring this linkage"
       return nil
     end
       
-    return sorts[0][0], sorts[0][1], abutting_links
+    return sorts[0][0][0], sorts[0][0][1], end_identifier_hash[sorts[0][0]]
   end
   
   def self.distance_between_contigs(contig_lengths, abuttings, abutting_links, mean_insert_size)
     # simply the mean of the individual estimates
-    abutting_links.collect {|link|
+    f = abutting_links.collect {|link|
       link.estimate_distance_between_contigs(contig_lengths, abuttings, mean_insert_size)
       }.inject{|total, cur| total+=cur}.to_f/abutting_links.length
+    return f.to_i
   end
 end
 
@@ -200,7 +200,6 @@ class ContigLinkSet < Hash
   def generate_graphviz(max_distance, options = {})
     options[:min_links] ||= 3
     raise unless options[:mean_insert_size]
-    raise unless options[:contig_lengths]
     
     # create initial graphviz nodes
     # each contig is 2 nodes - one for the start and one for the end
@@ -232,9 +231,15 @@ class ContigLinkSet < Hash
       linkset.contig2_length = @contig_lengths[contig_name_pair[1]]
       linkset.links = links
       
-      # Find the most likely form of linkage between the contigs
-      abutting1, abutting2, abutting_links = linkset.predict_best_abutting
+      contig1 = contig_name_pair[0]
+      contig2 = contig_name_pair[1]
       
+      # Find the most likely form of linkage between the contigs
+      abutting1, abutting2, abutting_links = linkset.predict_best_abutting(max_distance)
+      if abutting1.nil?
+        log.debug "No decent links or tied winner between #{contig1} and #{contig2}, not making a link"
+        next
+      end
 
       contig1 = contig_name_pair[0]
       contig2 = contig_name_pair[1]
@@ -249,11 +254,11 @@ class ContigLinkSet < Hash
       # create a new edge between the appropriate sides.
       log.debug "Assigning the link between #{contig1} and #{contig2}, as max #{max[1]}"
       
-      distance_between_contigs = linkset.distance_between_contigs(
+      distance_between_contigs = ContigLinkageSet.distance_between_contigs(
                                                                    [linkset.contig1_length, linkset.contig2_length],
                                                                    [abutting1, abutting2],
                                                                    abutting_links,
-                                                                   mean_insert_size
+                                                                   options[:mean_insert_size]
                                                                    )
       log.debug "Predicting a distance of #{distance_between_contigs} between #{contig1} and #{contig2}"
       
@@ -266,10 +271,10 @@ class ContigLinkSet < Hash
           raise "programming error"
         end
       end
-      from_node = assign_name.call(contig1, max[0][0])
-      to_node = assign_name.call(contig2, max[0][1])
+      from_node = assign_name.call(contig1, abutting1)
+      to_node = assign_name.call(contig2, abutting2)
   
-      graphviz.add_edges(from_node, to_node, :label => "#{max[1]}links_dist#{distance_between_contigs}")
+      graphviz.add_edges(from_node, to_node, :label => "#{abutting_links.length}links_dist#{distance_between_contigs}")
     end
     
     #return the entire graph
