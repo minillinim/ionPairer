@@ -86,6 +86,75 @@ class ContigLink
   end
 end
 
+# The set of links between two contigs
+class ContigLinkageSet
+  attr_accessor :contig1_name, :contig2_name
+  attr_accessor :contig1_length, :contig2_length
+  attr_accessor :links
+
+  def log
+    Bio::Log::LoggerPlus['contig_linker']
+  end
+  
+  def classified_abuttings_hash(max_distance)
+    end_identifier_hash = {}
+    @links.each do |link|
+      # near the start and correct direction for the first contig?
+      # which end is it near
+      contig_length1 = @contig_lengths[contig1]
+      contig_length2 = @contig_lengths[contig2]
+      if contig_length1.nil?
+        raise "Unexpected lack of @contig_lengths[#{contig1}] or @contig_lengths[#{contig2}]"
+      end
+      closest_ends = link.predict_link_ends(max_distance, @contig1_length, @contig2_length)
+      
+      key = closest_ends[0], closest_ends[1]
+      end_identifier_hash[key] ||= []
+      end_identifier_hash[key].push link
+    end
+    return
+  end
+  
+  # Work out the maximal direction of the linking - i.e. which ends should be joined.
+  # Return nil if there is no winner
+  def predict_best_abutting(max_distance)
+    # classify each link as start to start, etc.
+    end_identifier_hash = classified_abuttings_hash(max_distance)
+    log.debug "For #{@contig1_name} and #{@contig2_name} found the following types of links: #{end_identifier_hash.keys.inspect}"
+    
+    # Remove presumably spurious links
+    possibilities = [
+      ContigLink::START_OF_CONTIG,
+      ContigLink::END_OF_CONTIG,
+    ]
+    end_identifier_hash.select! do |key, links|
+      possibilities.include?(key[0]) and possibilities.include?(key[1])
+    end
+    
+    # sort the possibilities in reverse order
+    sorts = counts.to_a.sort{|a,b| -(a[1].length<=>b[1].length)}
+    log.debug "After sorting, got sorted pairs #{sorts.inspect} for #{contig1} and #{contig2}"
+    
+    return nil if sorts.length == 0
+    
+    # look for tied winners to be anal, return no links if this is the case
+    if sorts[0][1]==sorts[1][1] and
+      log.warn "Contig link #{@contig1_name} and #{@contig2_name} have confusing orientation statistics (#{sorts.inspect}), not putting into the graphviz file"
+      return nil
+    end
+      
+    return sorts[0][0], sorts[0][1], abutting_links
+  end
+  
+  def self.distance_between_contigs(contig_lengths, abuttings, abutting_links, mean_insert_size)
+    # simply the mean of the individual estimates
+    abutting_links.collect {|link|
+      link.estimate_distance_between_contigs(contig_lengths, abuttings, mean_insert_size)
+      }.inject{|total, cur| total+=cur}.to_f/abutting_links.length
+  end
+end
+
+# A class for sets of sets of contig linkages
 # A hash of [contig_name1, contig_name2] => Array of ContigLink's.
 class ContigLinkSet < Hash
   # Hash of contig names to lengths (lengths being integers)
@@ -114,6 +183,9 @@ class ContigLinkSet < Hash
     Bio::Log::LoggerPlus['contig_linker']
   end
   
+  # output to the graphviz file iff each side of the pair maps close enough to the ends of the contigs
+  # and is in a direction that makes sense like this.
+  #
   # options:
   # :mean_insert_size: mean insert size, to estimate amount of sequence between contig lengths [required]
   # :min_links: minimum number of links to bother drawing on the graph [default 3]
@@ -145,77 +217,37 @@ class ContigLinkSet < Hash
   
     # Iterate through contig pairs, outputing as necessary
     each do |contig_name_pair, links|
-      # output to the graphviz file iff each side of the pair maps close enough to the ends of the contigs
-      # and is in a direction that makes sense like this.
+      linkset = ContigLinkageSet.new
+      linkset.contig1_name = contig_name_pair[0]
+      linkset.contig2_name = contig_name_pair[1]
+      linkset.contig1_length = @contig_lengths[contig_name_pair[0]]
+      linkset.contig2_length = @contig_lengths[contig_name_pair[1]]
+      linkset.links = links
+      
+      # Find the most likely form of linkage between the contigs
+      abutting1, abutting2, abutting_links = linkset.predict_best_abutting
+      
+
       contig1 = contig_name_pair[0]
       contig2 = contig_name_pair[1]
       log.debug "evaluating #{contig1} and #{contig2}" unless log.nil?
       
-      end_identifier_counts = {}
-      links.each do |link|
-        # near the start and correct direction for the first contig?
-        # which end is it near
-        contig_length1 = @contig_lengths[contig1]
-        contig_length2 = @contig_lengths[contig2]
-        if contig_length1.nil?
-          raise "Unexpected lack of @contig_lengths[#{contig1}] or @contig_lengths[#{contig2}]"
-        end
-        closest_ends = link.predict_link_ends(max_distance, contig_length1, contig_length2)
-        
-        key = closest_ends[0], closest_ends[1]
-        end_identifier_counts[key] ||= 0
-        end_identifier_counts[key] += 1
-      end
-      log.debug "For #{contig1} and #{contig2} found the following types of links: #{end_identifier_counts.inspect}"
-      
-      # Output total answers
-      possibilities = [
-        ContigLink::START_OF_CONTIG,
-        ContigLink::END_OF_CONTIG,
-      ]
-      counts = {}
-      possibilities.each do |possibility1|
-        possibilities.each do |possibility2|
-          key = [possibility1, possibility2]
-          if end_identifier_counts.key?(key)
-            counts[key] = end_identifier_counts[key]
-          else
-            counts[key] = 0
-          end
-        end
-      end
-      
-      
-      # Make an automated decision about the contig lengths
-      # sort the possibilities in reverse order
-      sorts = counts.to_a.sort{|a,b| -(a[1]<=>b[1])}
-      log.debug "After sorting, got sorted pairs #{sorts.inspect} for #{contig1} and #{contig2}"
-      
-      # if there was no decent links, forget it
-      if sorts[0][1] == 0
-        log.debug "Not creating a the link between #{contig1} and #{contig2}, as there was no passable links"
-        next
-      end
-      
-      # Remove those with insufficient links
-      max = sorts[0]
-      unless max[1] >= options[:min_links]
+      # Remove those with insufficient numbers of links
+      unless abutting_links.length >= options[:min_links]
         log.debug "Not putting in linkage between #{contig1} and #{contig2}, as there was insufficient links (#{max[1]} found)"
         next
       end
       
-      # look for tied winners, don't put these as links in the graphviz
-      if sorts[0][1]==sorts[1][1]
-        log.warn "Contig link #{contig1} and #{contig2} have confusing orientation statistics (#{sorts.inspect}), not putting into the graphviz file"
-        next
-      end
-      
       # create a new edge between the appropriate sides.
-      if sorts.length > 1
-        log.debug "Assigning the link between #{contig1} and #{contig2}, as max #{max[1]}, second one #{sorts[1][1]}"
-      else
-        log.debug "Assigning the link between #{contig1} and #{contig2}, as max #{max[1]}, that was the only link type detected"
-      end
+      log.debug "Assigning the link between #{contig1} and #{contig2}, as max #{max[1]}"
+      
+      distance_between_contigs = linkset.distance_between_contigs(
+                                                                   [linkset.contig1_length, linkset.contig2_length],
+                                                                   [abutting1, abutting2],
+                                                                   abutting_links,
+                                                                   mean_insert_size
+                                                                   )
+      log.debug "Predicting a distance of #{distance_between_contigs} between #{contig1} and #{contig2}"
       
       assign_name = lambda do |contig_name, ending|
         if ending == ContigLink::START_OF_CONTIG
@@ -229,7 +261,7 @@ class ContigLinkSet < Hash
       from_node = assign_name.call(contig1, max[0][0])
       to_node = assign_name.call(contig2, max[0][1])
   
-      graphviz.add_edges(from_node, to_node, :label => "#{max[1]}links")
+      graphviz.add_edges(from_node, to_node, :label => "#{max[1]}links_dist#{distance_between_contigs}")
     end
     
     #return the entire graph
