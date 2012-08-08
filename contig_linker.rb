@@ -124,7 +124,7 @@ class ContigLinkageSet
   # Work out the maximal direction of the linking - i.e. which ends should be joined.
   # Return abutting1, abutting2, links
   # nil if there is no winner
-  def predict_best_abutting(max_distance)
+  def predict_best_abutting(max_distance, min_links)
     # classify each link as start to start, etc.
     end_identifier_hash = classified_abuttings_hash(max_distance)
     log.debug "For #{@contig1_name} and #{@contig2_name} found the following types of links: #{end_identifier_hash.keys.inspect}"
@@ -143,6 +143,15 @@ class ContigLinkageSet
     log.debug "After sorting, got sorted pairs #{sorts.inspect} for #{@contig1_name} and #{@contig2_name}"
     
     return nil if sorts.length == 0
+    
+      
+    # Remove those with insufficient numbers of links
+    high_number_of_links = sorts[0][1].length
+    log.debug "Highest number of links: #{high_number_of_links}, cutoff is #{min_links}"
+    unless high_number_of_links >= min_links
+      log.debug "Not putting in linkage between #{@contig1_name} and #{@contig2_name}, as there was insufficient links (#{high_number_of_links} found)"
+      return nil
+    end
     
     # look for tied winners to be anal, return no links if this is the case
     if sorts.length > 1 and sorts[0][1].length==sorts[1][1].length and
@@ -196,9 +205,9 @@ class ContigLinkSet < Hash
   #
   # options:
   # :mean_insert_size: mean insert size, to estimate amount of sequence between contig lengths [required]
-  # :min_links: minimum number of links to bother drawing on the graph [default 3]
+  # :min_links: minimum number of links to bother drawing on the graph [required]
   def generate_graphviz(max_distance, options = {})
-    options[:min_links] ||= 3
+    raise unless options[:min_links]
     raise unless options[:mean_insert_size]
     
     # create initial graphviz nodes
@@ -235,7 +244,7 @@ class ContigLinkSet < Hash
       contig2 = contig_name_pair[1]
       
       # Find the most likely form of linkage between the contigs
-      abutting1, abutting2, abutting_links = linkset.predict_best_abutting(max_distance)
+      abutting1, abutting2, abutting_links = linkset.predict_best_abutting(max_distance, options[:min_links])
       if abutting1.nil?
         log.debug "No decent links or tied winner between #{contig1} and #{contig2}, not making a link"
         next
@@ -244,12 +253,6 @@ class ContigLinkSet < Hash
       contig1 = contig_name_pair[0]
       contig2 = contig_name_pair[1]
       log.debug "evaluating #{contig1} and #{contig2}" unless log.nil?
-      
-      # Remove those with insufficient numbers of links
-      unless abutting_links.length >= options[:min_links]
-        log.debug "Not putting in linkage between #{contig1} and #{contig2}, as there was insufficient links (#{max[1]} found)"
-        next
-      end
       
       # create a new edge between the appropriate sides.
       log.debug "Assigning the link between #{contig1} and #{contig2}, as max #{max[1]}"
@@ -301,7 +304,8 @@ if __FILE__ == $0 #needs to be removed if this script is distributed as part of 
       
       Take an input linkage file, the 'all_links.csv' file, and output:
         
-        1. a graphviz file <linkage_file>.gv containing linkages between the contigs\n\n"
+        1. a graphviz file <linkage_file>.gv containing linkages between the contigs\
+        2. a PNG and SVG rendering of the graph in the graphviz file.n\n"
       
     opts.on("-l", "--linkage-file PATH", "linkage file from ionPairer.pl [required]") do |arg|
       options[:linkage_file] = arg
