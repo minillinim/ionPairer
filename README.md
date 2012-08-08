@@ -84,11 +84,9 @@ To modify the scaffolds, modify the ```dot``` file (maybe best to also copy it t
 ```
 contig00056END -- contig00073START [label="3links", ...
 ```
-Then simply comment it out:
-```
-#contig00056END -- contig00073START [label="3links", ...
-```
-and rerun graphviz, which will make a new png/svg file for you, like so
+Then simply delete the entire line. It may be advisable to save this modified version as a different file so you can use ```diff``` or ```meld``` to work out what has changed between the original and manually curated versions.
+
+Afterwards, rerun graphviz, which will make a new png/svg file for you, like so
 ```sh
 $ neato -Tpng forward_matesVmy_assembly.sam.all_links.manually_modified.dot >forward_matesVmy_assembly.sam.all_links.manually_modified.png
 ```
