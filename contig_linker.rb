@@ -21,7 +21,8 @@ class ContigLink
   INCONSISTENT_POSITION_AND_DISTANCE = 'inconsistent position and distance on contig ends'
   NOT_NEAR_EITHER_END = 'not near either end of the contig'
   
-  attr_accessor :position1, :position2,
+  attr_accessor :contig1_name, :contig2_name,
+    :position1, :position2,
     :direction1, :direction2
     
   def log
@@ -162,6 +163,15 @@ class ContigLinkageSet
     return sorts[0][0][0], sorts[0][0][1], end_identifier_hash[sorts[0][0]]
   end
   
+  # Return a ContigLinkageSet of links that don't agree with the abutting prediction
+  # i.e. those that have a non-agreeing direction or are too far from the
+  # relevent end to the contig
+  def disagreeing_links(abutting1, abutting2, max_distance)
+    classified_abuttings_hash(max_distance).reject do |abuttings, links|
+      abuttings[0] == abutting1 and abuttings[1] == abutting2
+    end.values.flatten
+  end
+  
   def self.distance_between_contigs(contig_lengths, abuttings, abutting_links, mean_insert_size)
     # simply the mean of the individual estimates
     f = abutting_links.collect {|link|
@@ -190,6 +200,8 @@ class ContigLinkSet < Hash
     relationship.position2 = array[1][1]
     relationship.direction1 = array[0][2]
     relationship.direction2 = array[1][2]
+    relationship.contig1_name = array[0][0]
+    relationship.contig2_name = array[1][0]
     
     key = [array[0][0], array[1][0]]
     self[key] ||= []
@@ -229,7 +241,8 @@ class ContigLinkSet < Hash
       graphviz.add_edges(start_name, stop_name, :style => "setlinewidth(4)", :label => contig, :color => color)
     end
     
-    
+    consistent_links = []
+    errored_links = []
   
     # Iterate through contig pairs, outputing as necessary
     each do |contig_name_pair, links|
@@ -247,12 +260,16 @@ class ContigLinkSet < Hash
       abutting1, abutting2, abutting_links = linkset.predict_best_abutting(max_distance, options[:min_links])
       if abutting1.nil?
         log.debug "No decent links or tied winner between #{contig1} and #{contig2}, not making a link"
+        errored_links.push linkset.links
         next
       end
-
-      contig1 = contig_name_pair[0]
-      contig2 = contig_name_pair[1]
+      
       log.debug "evaluating #{contig1} and #{contig2}" unless log.nil?
+      
+      # Store the good and the bad links
+      consistent_links.push abutting_links
+      errored_links.push linkset.disagreeing_links(abutting1, abutting2, max_distance)
+      log.debug "from #{abutting1},#{abutting2},#{max_distance}, got errored links #{errored_links.inspect}"
       
       # create a new edge between the appropriate sides.
       log.debug "Assigning the link between #{contig1} and #{contig2}, as max #{max[1]}"
@@ -281,7 +298,7 @@ class ContigLinkSet < Hash
     end
     
     #return the entire graph
-    return graphviz
+    return graphviz, consistent_links.flatten, errored_links.flatten
   end
 end
 
@@ -352,7 +369,6 @@ if __FILE__ == $0 #needs to be removed if this script is distributed as part of 
   end
   log.info "Cached #{contig_lengths.length} contig lengths from the fasta file, e.g #{contig_lengths.keys[0]} => #{contig_lengths[contig_lengths.keys[0]]}."
   
-  
   # read in the linkage file
   contig_linkset = ContigLinkSet.new
   ignored_as_the_same_contig = 0
@@ -394,12 +410,53 @@ if __FILE__ == $0 #needs to be removed if this script is distributed as part of 
   log.info "Read in linkages between #{contig_linkset.length} pairs of contigs. For instance between #{eg_key[0]} and #{eg_key[1]} there are #{eg.length} links"
   
   contig_linkset.contig_lengths = contig_lengths
-  graphviz = contig_linkset.generate_graphviz(options[:max_distance], {:min_links => options[:min_links], :mean_insert_size => options[:mean_insert_size]})
+  graphviz, consistent_links, error_links = contig_linkset.generate_graphviz(options[:max_distance], {:min_links => options[:min_links], :mean_insert_size => options[:mean_insert_size]})
+  
+  
+  # print consistent links
+  File.open("#{options[:linkage_file]}.filtered_links.csv",'w') do |f|
+    f.puts %w(
+      contig1_name contig1_length contig2_name contig2_length read1_position read1_direction read2_position read2_direction
+    )
+    consistent_links.each do |link|
+      f.puts [
+        link.contig1_name,
+        contig_lengths[link.contig1_name],
+        link.contig2_name,
+        contig_lengths[link.contig2_name],
+        link.position1,
+        link.direction1,
+        link.position2,
+        link.direction2,
+      ].join("\t")
+    end
+  end
+  
+  # print error links
+  File.open("#{options[:linkage_file]}.error_links.csv",'w') do |f|
+    f.puts %w(
+      contig1_name contig1_length contig2_name contig2_length read1_position read1_direction read2_position read2_direction
+    )
+    error_links.each do |link|
+      f.puts [
+        link.contig1_name,
+        contig_lengths[link.contig1_name],
+        link.contig2_name,
+        contig_lengths[link.contig2_name],
+        link.position1,
+        link.direction1,
+        link.position2,
+        link.direction2,
+      ].join("\t")
+    end
+  end
   
   # print outputs
   graphviz.output :dot => "#{options[:linkage_file]}.dot"
   graphviz.output :png => "#{options[:linkage_file]}.png", :use => :neato
   graphviz.output :svg => "#{options[:linkage_file]}.svg", :use => :neato
+  
+
   
 end #end if running as a script
 

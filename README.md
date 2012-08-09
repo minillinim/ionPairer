@@ -64,8 +64,8 @@ In that output directory ```ion_pairer_outputs``` there should be the following 
 * ```forward_matesVmy_assembly.sam.error_paired.csv``` Reads where both ends mapped, but erroneously due to insert size or relative orientation
 * ```forward_matesVmy_assembly.sam.unique_links.csv``` All pairs of mate pairs that span between two contigs and pass the pcr filter  
 * ```forward_matesVmy_assembly.sam.short_links.csv``` Pairs where one of the contigs was shorter than the insert size
-* ```forward_matesVmy_assembly.sam.error_links.csv``` Pairs which link two contigs, but erroneously due to insert size, position or relative orientation
-* ```forward_matesVmy_assembly.sam.filtered_links.csv``` Subset of unique pairs which are neither short nor erroneous
+* ```forward_matesVmy_assembly.sam.unique_links.error_links.csv``` Pairs which link two contigs, but erroneously due to insert size, position or relative orientation (these may indicate chimeras in the contigs)
+* ```forward_matesVmy_assembly.sam.unique_links.filtered_links.csv``` Subset of unique pairs which are neither short nor erroneous
 
 There'll also be three graphviz-related files:
 

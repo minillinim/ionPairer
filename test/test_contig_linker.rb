@@ -177,6 +177,27 @@ describe 'ContigLinkageSet' do
       100
     ).should eq(100-(50+40)/2)
   end
+  
+  it 'should give errored links' do
+    set = ContigLinkageSet.new
+    set.contig1_length = 30
+    set.contig2_length = 100
+    
+    link1 = ContigLink.new
+    link1.position1 = 30 #=> 30
+    link1.position2 = 80 #=> 20
+    link1.direction1 = '-'
+    link1.direction2 = '+'
+    link2 = ContigLink.new
+    link2.position1 = 20 #=> 20
+    link2.position2 = 80 #=> 20
+    link2.direction1 = '-'
+    link2.direction2 = '+'
+    set.links = [link1, link2]
+    
+    set.disagreeing_links(ContigLink::START_OF_CONTIG, ContigLink::END_OF_CONTIG, 10000).should eq([])
+    set.disagreeing_links(ContigLink::START_OF_CONTIG, ContigLink::END_OF_CONTIG, 1).should eq([link1, link2])
+  end
 end
 
 describe 'ContigLinkSet' do
@@ -199,7 +220,10 @@ describe 'ContigLinkSet' do
     set.add_contig_set('contig2', 2501, '-', 'contig1', 10, '+')
     #set.add_contig_set('contig2', 2501, '+', 'contig1', 10, '+')
     set.contig_lengths = {'contig1' => 1000, 'contig2' => 3000}
-    graph = set.generate_graphviz(54000, :min_links => 1, :mean_insert_size => 2000)
+    graph, consistents, errors = set.generate_graphviz(54000, :min_links => 1, :mean_insert_size => 2000)
+    consistents.length.should eq(2)
+    errors.length.should eq(0)
+    
     graph.node_count.should eq(4)
     graph.edge_count.should eq(3)
     expecteds = {
@@ -222,7 +246,7 @@ describe 'ContigLinkSet' do
     set.add_contig_set('contig2', 2501, '-', 'contig1', 10, '+')
     set.add_contig_set('contig3', 288, '+', 'contig4', 10, '-')
     set.contig_lengths = {'contig1' => 1000, 'contig2' => 3000, 'contig3' => 300, 'contig4' => 400}
-    graph = set.generate_graphviz(54000, :min_links => 1, :mean_insert_size => 2000)
+    graph, consistents, errors = set.generate_graphviz(54000, :min_links => 1, :mean_insert_size => 2000)
     
     graph.node_count.should eq(8)
     graph.edge_count.should eq(6)
@@ -247,7 +271,10 @@ describe 'ContigLinkSet' do
     set.length.should eq(0)
     set.add_contig_set('contig2', 2500, '-', 'contig1', 100, '+')
     set.contig_lengths = {'contig1' => 1000, 'contig2' => 3000}
-    graph = set.generate_graphviz(10, :min_links => 1, :mean_insert_size => 2000) #set the max distance to something impossible for testing purposes
+    graph, consistents, errors = set.generate_graphviz(10, :min_links => 1, :mean_insert_size => 10) #set the max distance to something impossible for testing purposes
+    consistents.length.should eq(0)
+    errors.length.should eq(1)
+    errors[0].position1.should eq(100)
     
     graph.node_count.should eq(4)
     graph.edge_count.should eq(2)
@@ -268,9 +295,9 @@ describe 'ContigLinkSet' do
     set.length.should eq(0)
     set.add_contig_set('contig2', 2500, '-', 'contig1', 100, '+')
     set.contig_lengths = {'contig1' => 1000, 'contig2' => 3000}
-    graph = set.generate_graphviz(54000, :min_links => 1, :mean_insert_size => 2000).edge_count.should eq(3)
-    graph = set.generate_graphviz(54000, :min_links => 2, :mean_insert_size => 2000).edge_count.should eq(2)
-    graph = set.generate_graphviz(54000, :min_links => 3, :mean_insert_size => 2000).edge_count.should eq(2)
+    set.generate_graphviz(54000, :min_links => 1, :mean_insert_size => 2000)[0].edge_count.should eq(3)
+    set.generate_graphviz(54000, :min_links => 2, :mean_insert_size => 2000)[0].edge_count.should eq(2)
+    set.generate_graphviz(54000, :min_links => 3, :mean_insert_size => 2000)[0].edge_count.should eq(2)
   end
 end
 
@@ -280,8 +307,6 @@ end
 describe 'the script' do
   
   it 'should work somewhat' do
-    #  Dir.chdir tmpdirectory #run everything in a temporary directory
-
     # Create a dummy input file
     input = [
       'h1 h2 h3 h4 h5 h6 h7 h8',
@@ -339,9 +364,13 @@ describe 'the script' do
     dot_filename = "#{links_basename}.dot"
     png_filename = "#{links_basename}.png"
     svg_filename = "#{links_basename}.svg"
+    filtered_filename = "#{links_basename}.filtered_links.csv"
+    error_filename = "#{links_basename}.error_links.csv"
     File.exists?(dot_filename).should be true
     File.exists?(png_filename).should be true
     File.exists?(svg_filename).should be true
+    File.exists?(filtered_filename).should be true
+    File.exists?(error_filename).should be true
     
     # Read in the graphviz file, make sure it is all good
     GraphViz.parse(dot_filename) do |g|
@@ -357,6 +386,8 @@ describe 'the script' do
       dot_filename,
       png_filename,
       svg_filename,
+      filtered_filename,
+      error_filename
     ].each do |f|
       File.delete f
     end

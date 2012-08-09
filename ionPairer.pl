@@ -85,8 +85,6 @@ my $unpaired_file = File::Spec->catfile($global_options->{'working_dir'}, $file_
 my $pcr_duplicate_file = File::Spec->catfile($global_options->{'working_dir'}, $file_root.".pcr_duplicates.csv");
 my $error_paired_file = File::Spec->catfile($global_options->{'working_dir'}, $file_root.".error_paired.csv");
 my $paired_file = File::Spec->catfile($global_options->{'working_dir'}, $file_root.".paired.csv");
-my $error_links_file = File::Spec->catfile($global_options->{'working_dir'}, $file_root.".error_links.csv");
-my $filtered_links_file = File::Spec->catfile($global_options->{'working_dir'}, $file_root.".filtered_links.csv");
 my $short_links_file = File::Spec->catfile($global_options->{'working_dir'}, $file_root.".short_links.csv");
 my $all_links_file = File::Spec->catfile($global_options->{'working_dir'}, $file_root.".unique_links.csv");
 
@@ -94,8 +92,6 @@ my $pcr_duplicate_fh = openWrite($pcr_duplicate_file);
 my $unpaired_fh = openWrite($unpaired_file);
 my $error_paired_fh = openWrite($error_paired_file);
 my $paired_fh = openWrite($paired_file);
-my $error_links_fh = openWrite($error_links_file);
-my $filtered_links_fh = openWrite($filtered_links_file);
 my $short_links_fh = openWrite($short_links_file);
 my $all_links_fh = openWrite($all_links_file);
 
@@ -111,9 +107,7 @@ print $unpaired_fh $unpaired_header;
 print $paired_fh $paired_header;
 print $error_paired_fh $paired_header;
 print $all_links_fh $all_links_header;
-print $filtered_links_fh $links_header;
 print $short_links_fh $links_header;
-print $error_links_fh $links_header;
 print $pcr_duplicate_fh $pcr_header;
 
 # parse the sam files
@@ -411,49 +405,13 @@ foreach my $read_id (keys %global_reads_2_map) {
             if(($contig1_length < $mean) or ($contig2_length < $mean)) {
                 # one contig or another is too short.
                 print $short_links_fh $link_print."\n";
-            } else {
-                # keep the distances
-                my $dist_1 = 0;
-                my $dist_2 = 0;
-
-                # make a key!
-                my @key = ('0','0','0','0');                
-                # strandedness
-                if(1 == $array[3]) { $key[1] = '1'; }
-                if(1 == $array[7]) { $key[3] = '1'; }
-                
-                if($array[1] < $upper_limit) { $key[0] = '0'; $dist_1 = $array[1]; }
-                elsif($array[1] > ($contig1_length - $upper_limit)) {  $key[0] = '1'; $dist_1 = $contig1_length - $array[1]; }
-                else {
-                    # read one lies too far into the contig
-                    print $error_links_fh $link_print.$delimeter."1\n";
-                    next;
-                }
-                
-                if($array[5] < $upper_limit) { $key[2] = '0'; $dist_2 = $array[5]; }
-                elsif($array[5] > ($contig2_length - $upper_limit)) { $key[2] = '1'; $dist_2 = $contig2_length - $array[5];}
-                else {
-                    # read two lies too far into the contig
-                    print $error_links_fh $link_print.$delimeter."2\n";
-                    next;
-                }
-                
-                my $index_key = join("", @key);
-                my $k_type = $type_table{$index_key};
-                if($k_type == $true_type) {
-                    print $filtered_links_fh $link_print."\n";
-                } else {
-                    print $error_links_fh $link_print.$delimeter."T\n";
-                }
             } 
         }
     }
 }
 
-close $filtered_links_fh;
 close $paired_fh;
 close $unpaired_fh;
-close $error_links_fh;
 close $error_paired_fh;
 close $short_links_fh;
 close $all_links_fh;
@@ -719,13 +677,13 @@ __Script__Name__
 
     Produces output files:
     
-     SAMFILE1.unpaired.csv          - Reads where only one end mapped to a contig
-     SAMFILE1.pcr_duplicates.csv    - Reads removed from further analysis as they were judged to be PCR duplicates
-     SAMFILE1.paired.csv            - Reads where both ends mapped onto one contig
-     SAMFILE1.error_paired.csv      - Reads where both ends mapped, but erroneously due to insert size or relative orientation
-     SAMFILE1.unique_links.csv      - All pairs of mate pairs that span between two contigsand pass the pcr filter  
-     SAMFILE1.short_links.csv       - Pairs where one of the contigs was shorter than the insert size
-     SAMFILE1.error_links.csv       - Pairs which link two contigs, but erroneously due to insert size, position or relative orientation
-     SAMFILE1.filtered_links.csv    - Subset of unique pairs which are neither short nor erroneous
+     SAMFILE1.unpaired.csv                           - Reads where only one end mapped to a contig
+     SAMFILE1.pcr_duplicates.csv                     - Reads removed from further analysis as they were judged to be PCR duplicates
+     SAMFILE1.paired.csv                             - Reads where both ends mapped onto one contig
+     SAMFILE1.error_paired.csv                       - Reads where both ends mapped, but erroneously due to insert size or relative orientation
+     SAMFILE1.unique_links.csv                       - All pairs of mate pairs that span between two contigsand pass the pcr filter  
+     SAMFILE1.short_links.csv                        - Pairs where one of the contigs was shorter than the insert size
+     SAMFILE1.unique_links.csv.error_links.csv       - Pairs which link two contigs, but erroneously due to insert size, position or relative orientation
+     SAMFILE1.unique_links.csv.filtered_links.csv    - Subset of unique pairs which are neither short nor erroneous
      
 =cut
