@@ -23,7 +23,8 @@ class ContigLink
   
   attr_accessor :contig1_name, :contig2_name,
     :position1, :position2,
-    :direction1, :direction2
+    :direction1, :direction2,
+    :read_name
     
   def log
     Bio::Log::LoggerPlus['contig_linker']
@@ -188,7 +189,8 @@ class ContigLinkSet < Hash
   attr_accessor :contig_lengths
   
   def add_contig_set(contig1_name, pair1_position, pair1_direction,
-                     contig2_name, pair2_position, pair2_direction)
+                     contig2_name, pair2_position, pair2_direction,
+                     read_name)
     
     # order by contig names, otherwise hashing is harder
     one = [contig1_name, pair1_position, pair1_direction]
@@ -202,6 +204,7 @@ class ContigLinkSet < Hash
     relationship.direction2 = array[1][2]
     relationship.contig1_name = array[0][0]
     relationship.contig2_name = array[1][0]
+    relationship.read_name = read_name
     
     key = [array[0][0], array[1][0]]
     self[key] ||= []
@@ -373,12 +376,12 @@ if __FILE__ == $0 #needs to be removed if this script is distributed as part of 
   contig_linkset = ContigLinkSet.new
   ignored_as_the_same_contig = 0
   csv.open(options[:linkage_file], :col_sep => "\t", :headers => true).each do |row|
-    # contig1_name  position1  mapping_quality1  direction1  contig2_name  position2  mapping_quality2  direction2
-    #70	25937	149	1	70	24818	17	0
-    #54	32081	20	1	54	29539	142	0
-    #86	8990	9	1	86	7389	153	0
-    #88	14033	20	1	88	12003	24	0
-    raise "Unexpected number of columns in all_links file" if row.length != 8
+    # contig1_name  position1  mapping_quality1  direction1  contig2_name  position2  mapping_quality2  direction2 read_name
+    #70	25937	149	1	70	24818	17	0 read1
+    #54	32081	20	1	54	29539	142	0 read2 
+    #86	8990	9	1	86	7389	153	0 read3
+    #88	14033	20	1	88	12003	24	0 read4
+    raise "Unexpected number of columns in all_links file" if row.length != 9
     
     if row[0]==row[4]
       ignored_as_the_same_contig += 1
@@ -401,7 +404,8 @@ if __FILE__ == $0 #needs to be removed if this script is distributed as part of 
   
       contig_linkset.add_contig_set(
         row[0], row[1], row[3],
-        row[4], row[5], row[7]
+        row[4], row[5], row[7],
+        row[8]
       )
     end
   end
@@ -413,43 +417,30 @@ if __FILE__ == $0 #needs to be removed if this script is distributed as part of 
   graphviz, consistent_links, error_links = contig_linkset.generate_graphviz(options[:max_distance], {:min_links => options[:min_links], :mean_insert_size => options[:mean_insert_size]})
   
   
-  # print consistent links
-  File.open("#{options[:linkage_file]}.filtered_links.csv",'w') do |f|
-    f.puts %w(
-      contig1_name contig1_length contig2_name contig2_length read1_position read1_direction read2_position read2_direction
-    )
-    consistent_links.each do |link|
-      f.puts [
-        link.contig1_name,
-        contig_lengths[link.contig1_name],
-        link.contig2_name,
-        contig_lengths[link.contig2_name],
-        link.position1,
-        link.direction1,
-        link.position2,
-        link.direction2,
-      ].join("\t")
+  print_me = lambda do |file, links|
+    # print consistent links
+    File.open(file,'w') do |f|
+      f.puts %w(
+        contig1_name contig1_length contig2_name contig2_length read1_position read1_direction read2_position read2_direction read_basename
+      ).join("\t")
+      consistent_links.each do |link|
+        f.puts [
+          link.contig1_name,
+          contig_lengths[link.contig1_name],
+          link.contig2_name,
+          contig_lengths[link.contig2_name],
+          link.position1,
+          link.direction1,
+          link.position2,
+          link.direction2,
+          link.read_name,
+        ].join("\t")
+      end
     end
   end
-  
-  # print error links
-  File.open("#{options[:linkage_file]}.error_links.csv",'w') do |f|
-    f.puts %w(
-      contig1_name contig1_length contig2_name contig2_length read1_position read1_direction read2_position read2_direction
-    )
-    error_links.each do |link|
-      f.puts [
-        link.contig1_name,
-        contig_lengths[link.contig1_name],
-        link.contig2_name,
-        contig_lengths[link.contig2_name],
-        link.position1,
-        link.direction1,
-        link.position2,
-        link.direction2,
-      ].join("\t")
-    end
-  end
+
+  print_me.call "#{options[:linkage_file]}.filtered_links.csv", consistent_links
+  print_me.call "#{options[:linkage_file]}.error_links.csv", error_links
   
   # print outputs
   graphviz.output :dot => "#{options[:linkage_file]}.dot"

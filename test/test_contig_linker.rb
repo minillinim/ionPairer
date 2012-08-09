@@ -206,7 +206,7 @@ describe 'ContigLinkSet' do
     #                   contig2_name, pair2_position, pair2_direction)
     set = ContigLinkSet.new
     set.length.should eq(0)
-    set.add_contig_set('contig2', 200, '-', 'contig1', 100, '+')
+    set.add_contig_set('contig2', 200, '-', 'contig1', 100, '+','aread')
     set.values.length.should eq(1)
     set.keys[0].should eq(['contig1', 'contig2'])
     set.values[0].length.should eq(1)
@@ -216,8 +216,8 @@ describe 'ContigLinkSet' do
   it 'should graphviz on a single link. Easy right?' do
     set = ContigLinkSet.new
     set.length.should eq(0)
-    set.add_contig_set('contig2', 2500, '-', 'contig1', 100, '+')
-    set.add_contig_set('contig2', 2501, '-', 'contig1', 10, '+')
+    set.add_contig_set('contig2', 2500, '-', 'contig1', 100, '+','aread')
+    set.add_contig_set('contig2', 2501, '-', 'contig1', 10, '+','aread')
     #set.add_contig_set('contig2', 2501, '+', 'contig1', 10, '+')
     set.contig_lengths = {'contig1' => 1000, 'contig2' => 3000}
     graph, consistents, errors = set.generate_graphviz(54000, :min_links => 1, :mean_insert_size => 2000)
@@ -242,9 +242,9 @@ describe 'ContigLinkSet' do
   it 'should graphviz with 2 sets of contigs' do
     set = ContigLinkSet.new
     set.length.should eq(0)
-    set.add_contig_set('contig2', 2500, '-', 'contig1', 100, '+')
-    set.add_contig_set('contig2', 2501, '-', 'contig1', 10, '+')
-    set.add_contig_set('contig3', 288, '+', 'contig4', 10, '-')
+    set.add_contig_set('contig2', 2500, '-', 'contig1', 100, '+','aread')
+    set.add_contig_set('contig2', 2501, '-', 'contig1', 10, '+','aread')
+    set.add_contig_set('contig3', 288, '+', 'contig4', 10, '-','aread')
     set.contig_lengths = {'contig1' => 1000, 'contig2' => 3000, 'contig3' => 300, 'contig4' => 400}
     graph, consistents, errors = set.generate_graphviz(54000, :min_links => 1, :mean_insert_size => 2000)
     
@@ -269,7 +269,7 @@ describe 'ContigLinkSet' do
   it 'should gracefully handle no links' do
     set = ContigLinkSet.new
     set.length.should eq(0)
-    set.add_contig_set('contig2', 2500, '-', 'contig1', 100, '+')
+    set.add_contig_set('contig2', 2500, '-', 'contig1', 100, '+','aread')
     set.contig_lengths = {'contig1' => 1000, 'contig2' => 3000}
     graph, consistents, errors = set.generate_graphviz(10, :min_links => 1, :mean_insert_size => 10) #set the max distance to something impossible for testing purposes
     consistents.length.should eq(0)
@@ -293,7 +293,7 @@ describe 'ContigLinkSet' do
   it 'should respect min_links' do
     set = ContigLinkSet.new
     set.length.should eq(0)
-    set.add_contig_set('contig2', 2500, '-', 'contig1', 100, '+')
+    set.add_contig_set('contig2', 2500, '-', 'contig1', 100, '+','aread')
     set.contig_lengths = {'contig1' => 1000, 'contig2' => 3000}
     set.generate_graphviz(54000, :min_links => 1, :mean_insert_size => 2000)[0].edge_count.should eq(3)
     set.generate_graphviz(54000, :min_links => 2, :mean_insert_size => 2000)[0].edge_count.should eq(2)
@@ -310,10 +310,10 @@ describe 'the script' do
     # Create a dummy input file
     input = [
       'h1 h2 h3 h4 h5 h6 h7 h8',
-      "contig1	25937	149	0	contig2	23	17	1",
-      "contig1	25941	20	0	contig2	54	142	1",
-      "contig3	8990	9	1	contig4	7389	153	0",
-      "contig5	14033	20	1	contig6	12003	24	0",
+      "contig1	25937	149	0	contig2	23	17	1 read1",
+      "contig1	25941	20	0	contig2	54	142	1 reada2",
+      "contig3	8990	9	1	contig4	7389	153	0 read3",
+      "contig5	14033	20	1	contig6	12003	24	0 read4",
       ].collect{|s| s.split(/\s/).join("\t")}
     fasta = [
       '>contig1',

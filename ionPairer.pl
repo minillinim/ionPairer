@@ -391,10 +391,10 @@ foreach my $read_id (keys %global_reads_2_map) {
             # possible linker
             
             # make the print statements consistant
-            my $all_print = join $delimeter, ($contig2_name, $array[5], $array[6], $array[7],$contig1_name, $array[1], $array[2], $array[3]);
+            my $all_print = join $delimeter, ($contig2_name, $array[5], $array[6], $array[7],$contig1_name, $array[1], $array[2], $array[3], $read_id);
             my $link_print = join($delimeter, ($contig2_name,$contig2_length,$contig1_name,$contig1_length,$read_id,$array[5],$array[7],$array[1],$array[3]));
             if($contig1_name lt $contig2_name) {
-                $all_print = join $delimeter, ($contig1_name, $array[1], $array[2], $array[3],$contig2_name, $array[5], $array[6], $array[7]);
+                $all_print = join $delimeter, ($contig1_name, $array[1], $array[2], $array[3],$contig2_name, $array[5], $array[6], $array[7], $read_id);
                 $link_print = join($delimeter, ($contig1_name,$contig1_length,$contig2_name,$contig2_length,$read_id,$array[1],$array[3],$array[5],$array[7]));
             }
 
