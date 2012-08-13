@@ -1,15 +1,15 @@
-
-     d8b                   8888888b.          d8b                         
-     Y8P                   888   Y88b         Y8P                         
-                           888    888                                     
-     888  .d88b.  88888b.  888   d88P 8888b.  888 888d888 .d88b.  888d888      
-     888 d88""88b 888 "88b 8888888P"     "88b 888 888P"  d8P  Y8b 888P"   
-     888 888  888 888  888 888       .d888888 888 888    88888888 888     
-     888 Y88..88P 888  888 888       888  888 888 888    Y8b.     888     
-     888  "Y88P"  888  888 888       "Y888888 888 888     "Y8888  888     
+          
+               d8b                   8888888b.          d8b                         
+               Y8P                   888   Y88b         Y8P                         
+                                     888    888                                     
+               888  .d88b.  88888b.  888   d88P 8888b.  888 888d888 .d88b.  888d888      
+               888 d88""88b 888 "88b 8888888P"     "88b 888 888P"  d8P  Y8b 888P"   
+               888 888  888 888  888 888       .d888888 888 888    88888888 888     
+               888 Y88..88P 888  888 888       888  888 888 888    Y8b.     888     
+               888  "Y88P"  888  888 888       "Y888888 888 888     "Y8888  888     
                                                                                                         
- 
-       Scrimpy way to scaffold an assembly using ion torrent reads.
+           
+                 Scrimpy way to scaffold an assembly using ion torrent reads.
 
 # Overview
 
@@ -23,8 +23,9 @@ and mate pair data generated through ionTorrent. The original data files are not
 It's a bit complicated. You need several things:
 
 * Perl
-* Ruby (v1.9.3 tested only)
+* Ruby
 * GraphViz
+* Perl dependencies
 * Ruby dependencies
 
 The few Ruby depencies can be installed by changing directory to the base directory
@@ -61,10 +62,10 @@ In that output directory ```ion_pairer_outputs``` there should be the following 
 * ```forward_matesVmy_assembly.sam.pcr_duplicates.csv``` Reads removed from further analysis as they were judged to be PCR duplicates
 * ```forward_matesVmy_assembly.sam.paired.csv``` Reads where both ends mapped onto one contig
 * ```forward_matesVmy_assembly.sam.error_paired.csv``` Reads where both ends mapped, but erroneously due to insert size or relative orientation
-* ```forward_matesVmy_assembly.sam.unique_links.csv``` All pairs of mate pairs that span between two contigsand pass the pcr filter  
+* ```forward_matesVmy_assembly.sam.unique_links.csv``` All pairs of mate pairs that span between two contigs and pass the pcr duplicates filter  
 * ```forward_matesVmy_assembly.sam.short_links.csv``` Pairs where one of the contigs was shorter than the insert size
-* ```forward_matesVmy_assembly.sam.error_links.csv``` Pairs which link two contigs, but erroneously due to insert size, position or relative orientation
-* ```forward_matesVmy_assembly.sam.filtered_links.csv``` Subset of unique pairs which are neither short nor erroneous
+* ```forward_matesVmy_assembly.sam.unique_links.error_links.csv``` Pairs which link two contigs, but erroneously due to insert size, position or relative orientation (these may indicate chimeras in the contigs)
+* ```forward_matesVmy_assembly.sam.unique_links.filtered_links.csv``` Subset of unique pairs which are neither short nor erroneous
 
 There'll also be three graphviz-related files:
 
@@ -83,11 +84,9 @@ To modify the scaffolds, modify the ```dot``` file (maybe best to also copy it t
 ```
 contig00056END -- contig00073START [label="3links", ...
 ```
-Then simply comment it out:
-```
-#contig00056END -- contig00073START [label="3links", ...
-```
-and rerun graphviz, which will make a new png/svg file for you, like so
+Then simply delete the entire line. It may be advisable to save this modified version as a different file so you can use ```diff``` or ```meld``` to work out what has changed between the original and manually curated versions.
+
+Afterwards, rerun graphviz, which will make a new png/svg file for you, like so
 ```sh
 $ neato -Tpng forward_matesVmy_assembly.sam.all_links.manually_modified.dot >forward_matesVmy_assembly.sam.all_links.manually_modified.png
 ```
