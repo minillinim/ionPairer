@@ -68,14 +68,17 @@ my $global_contig_id = 1; #increment the number when printing, so that it is con
 open my $gv_fh, "<",$global_options->{'gv'}  || die $! ;
 while (<$gv_fh>) {
     chomp $_;
-    next if ($_ =~ /digraph/);
-    next if ($_ =~ /style/);
-	next if ($_ =~ /};/);
+    next if ($_ =~ /graph/);
+    next if ($_ =~ /node/);
+    next if ($_ =~ /graph/);
+    next if ($_ =~ /height/);
+    next if ($_ =~ /color/);
+	next if ($_ =~ /}/);
 	$_ =~ s/"//g;
 	$_ =~ s/\[.*\];//g;
 	$_ =~ s/^\s+//;
 	# Parse both pairs in .gv
-	my @fields = split(/ -> /, $_);
+	my @fields = split(/ -- /, $_);
 	# Store the name of the contigs with the START/END
     my ($pair1) = $fields[0];
     my ($pair2) = $fields[1];
@@ -537,3 +540,4 @@ scaffolder.pl  [-help|h] -g|gv <gv_file> -f|fasta <fasta_file>
 -g -gv FILE                  Graphviz file
 -f -fasta FILE               File containing contigs
 =cut
+
