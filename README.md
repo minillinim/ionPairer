@@ -95,10 +95,38 @@ $ neato -Tpng forward_matesVmy_assembly.sam.all_links.manually_modified.dot >for
 ## Once you are happy with the manual assembly and want to do the actual scaffolding
 Once the ```.dot``` file has been editted to your satisfaction, you have 2 options.
 
-1. Use the ```scaffolder.pl``` script to create the scaffolds. This script will orient the contigs (forward or reverse complement) and scaffold, based on the dot file. There is a small bug though, where single unlinked contigs have to be manually added into the final output ```.scaffolded```. 
-```scaffolder2.pl -g edited.dot -f contigs.fa > scaffold_map```
-2. Use the ```dot_to_scaffolder_yaml.rb``` script to convert the dot file to a YAML file, in a particular [format](http://next.gs). This YAML file can be further modified, for example to overlap contig ends.
+1. Use the ```scaffolder.pl``` script to create the scaffolds. This script will orient the contigs (forward or reverse complement) and scaffold, based on the dot file. There is a small bug though, where single unlinked contigs have to be manually added into the final output ```.scaffolded```.
 
+Example usage:
+```sh
+$ scaffolder.pl -g edited.gv -f contigs.fna > scaffold_map.fna
+```
+
+2. Use the ```dot_to_scaffolder_yaml.rb``` script to convert the dot file to a YAML file, in a particular [format](http://next.gs). This YAML file can be further modified, for example to overlap contig ends. This script is in the tools folder.
+
+Example usage:
+```sh
+$ mkdir scaffolds
+$ dot_to_scaffolder_yaml.rb -g edited.gv -d scaffolds
+```
+
+## Joining contigs across unresolved parts
+Sometimes if two contigs reside next to each other in a scaffold, then they in reality overlap - there is no Ns between them. The tool ```blast_contig_ends.rb``` automates the process of looking for these using a simple blast-based method (blast+, that is). If the output of this script shows that, indeed, some contigs do overlap, then modify the output from ```dot_to_scaffolder_yaml.rb```, deleting the relevant ```unresolved``` bit and specify where exactly the overlap occurs by using ```start``` and ```stop```. See http://next.gs/man/scaffolder-format/ for more information. When finished use the ```scaffolder``` tool from http://next.gs to generate the final, assembled, fasta file.
+
+Example usage:
+```sh
+$ blast_contig_ends.rb -d edited.gv -s contigs.fna
+ INFO blast_contig_ends: Cached 117 sequences, e.g. contig00001 => CGCTTGGCCT...
+
+Possible overlap on scaffold 3 between contigs contig00097 (start) and contig00035 (start), %ID 92.96, Length 199, 1-199 vs 199-2
+   first TCATCAAATTACGTAGGAGCACGGGAGGTAATAAGACATACACAAGGAAAAAaCAGATGACGAAGGAGAAACACGCTGCGCTATTATAGTTCGGGCCTACCCGAGAATTGTGGAGGGCTCTCTACTCACTTAAGTGAAAACGAAATTGCGACTGAAAAAGCACTCCCAGTAATCTGCTAACAGCATACGGCTAGAAATTG
+  second TAATTTCTAGCCGCATGCTGTTAGCAGATTACTGCGAGTGCTTTTTCAGTCGCAATTtCGTTTTCACTTAAGTGAGTAGAGGGCCTGTCACAGTTCTCGGGTAGGCCCGAGCTATAATAGCGCAGCGTGTTTCTCCTTCGTCATCTGTTTTTTCCTTGTGTATGCCTTATTACCTTCCGTGCGCTACTCAATTTGATGAT
+
+(manually modify scaffolds/scaffold3.yml to indicate the overlap)
+
+$ scaffolder sequence scaffolds/scaffold3.yml contigs.fna >scaffolds.scaffold3.fna
+```
+That last step needs to be repeated for each scaffold (potentially in a bash for loop).
 
 # Administration
 
