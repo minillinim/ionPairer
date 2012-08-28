@@ -95,7 +95,8 @@ $ neato -Tpng forward_matesVmy_assembly.sam.all_links.manually_modified.dot >for
 ## Once you are happy with the manual assembly and want to do the actual scaffolding
 Once the ```.dot``` file has been editted to your satisfaction, you have 2 options.
 
-1. Use the ```scaffolder.pl``` script to create the scaffolds. This script will orient the contigs (forward or reverse complement) and scaffold, based on the dot file. **There is a small bug though, where single unlinked contigs have to be manually added.**
+1. Use the ```scaffolder.pl``` script to create the scaffolds. This script will orient the contigs (forward or reverse complement) and scaffold, based on the dot file. There is a small bug though, where single unlinked contigs have to be manually added into the final output ```.scaffolded```. 
+```scaffolder2.pl -g edited.dot -f contigs.fa > scaffold_map```
 2. Use the ```dot_to_scaffolder_yaml.rb``` script to convert the dot file to a YAML file, in a particular [format](http://next.gs). This YAML file can be further modified, for example to overlap contig ends.
 
 
