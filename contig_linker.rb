@@ -443,7 +443,7 @@ if __FILE__ == $0 #needs to be removed if this script is distributed as part of 
   print_me.call "#{options[:linkage_file]}.error_links.csv", error_links
   
   # print outputs
-  graphviz.output :dot => "#{options[:linkage_file]}.dot"
+  graphviz.output :dot => "#{options[:linkage_file]}.gv"
   graphviz.output :png => "#{options[:linkage_file]}.png", :use => :neato
   graphviz.output :svg => "#{options[:linkage_file]}.svg", :use => :neato
   
