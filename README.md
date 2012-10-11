@@ -69,7 +69,7 @@ In that output directory ```ion_pairer_outputs``` there should be the following 
 
 There'll also be three graphviz-related files:
 
-* ```forward_matesVmy_assembly.sam.unique_links.dot``` The dot file used to specify the links between contigs
+* ```forward_matesVmy_assembly.sam.unique_links.gv``` The dot file (GraphViz file) used to specify the links between contigs
 * ```forward_matesVmy_assembly.sam.unique_links.png``` A png picture representation of the dot file. The colours are meaningful. Specifically red contigs are longer than 2x 
 * ```forward_matesVmy_assembly.sam.unique_links.svg``` An svg picture representation of the dot file
 
@@ -79,7 +79,7 @@ The fun bit! In
 is a representation of the links that have been made, and the number of mate-pairs that 
 agree with that linking.
 
-To modify the scaffolds, modify the ```dot``` file (maybe best to also copy it to a new file ```forward_matesVmy_assembly.sam.all_links.manually_modified.dot```). For instance if this link is no good, for whatever reason:
+To modify the scaffolds, modify the ```gv``` file (maybe best to also copy it to a new file ```forward_matesVmy_assembly.sam.all_links.manually_modified.gv```). For instance if this link is no good, for whatever reason:
 
 ```
 contig00056END -- contig00073START [label="3links", ...
@@ -88,12 +88,12 @@ Then simply delete the entire line. It may be advisable to save this modified ve
 
 Afterwards, rerun graphviz, which will make a new png/svg file for you, like so
 ```sh
-$ neato -Tpng forward_matesVmy_assembly.sam.all_links.manually_modified.dot >forward_matesVmy_assembly.sam.all_links.manually_modified.png
+$ neato -Tpng forward_matesVmy_assembly.sam.all_links.manually_modified.gv >forward_matesVmy_assembly.sam.all_links.manually_modified.png
 ```
 (or ```-Tsvg``` for svg output.)
 
 ## Once you are happy with the manual assembly and want to do the actual scaffolding
-Once the ```.dot``` file has been editted to your satisfaction, you have 2 options.
+Once the ```.gv``` file has been editted to your satisfaction, you have 2 options.
 
 1. Use the ```scaffolder.pl``` script to create the scaffolds. This script will orient the contigs (forward or reverse complement) and scaffold, based on the dot file. There is a small bug though, where single unlinked contigs have to be manually added into the final output ```.scaffolded```.
 
