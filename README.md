@@ -25,7 +25,7 @@ It's a bit complicated. You need several things:
 * Perl
 * Ruby
 * GraphViz
-* Perl dependencies
+* Perl dependencies (some core + Bio::SeqIO, Bio::DB::Sam)
 * Ruby dependencies
 
 The few Ruby depencies can be installed by changing directory to the base directory

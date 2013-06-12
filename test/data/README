@@ -1,0 +1,10 @@
+TEST DATA
+
+Paired reads, F.fa and R.fa
+
+Three contig files:
+
+complete.fa is one contiguous contig
+oneCut.fa is complete with a missing segment
+twoCuts.fa is complete with 2 missing segments
+

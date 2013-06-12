@@ -3,7 +3,7 @@
 #
 #   ionPairer.pl
 #
-#   Work out paired mappings based on information in a sam file
+#   Work out paired mappings based on information in a bam file
 #
 #   Copyright (C) Michael Imelfort, Ben Woodcroft
 #
@@ -35,6 +35,8 @@ use File::Spec;
 use File::Basename;
 use Bio::SeqIO;
 use Data::Dumper;
+use Bio::DB::Sam;
+use Bio::DB::Bam::Alignment;
 
 #locally-written modules
 
@@ -79,7 +81,7 @@ my $global_minimum_links = overrideDefault(3, 'min_links'); # minimum number of 
 my $reference_fasta = $global_options->{'reference_fasta'};
 
 # get output file names and handles
-my ($file_root, undef, undef) = fileparse($global_options->{'sam1'});
+my ($file_root, undef, undef) = fileparse($global_options->{'bam1'});
 
 my $unpaired_file = File::Spec->catfile($global_options->{'working_dir'}, $file_root.".unpaired.csv");
 my $pcr_duplicate_file = File::Spec->catfile($global_options->{'working_dir'}, $file_root.".pcr_duplicates.csv");
@@ -110,78 +112,69 @@ print $all_links_fh $all_links_header;
 print $short_links_fh $links_header;
 print $pcr_duplicate_fh $pcr_header;
 
-# parse the sam files
-my @samfiles = ($global_options->{'sam1'},$global_options->{'sam2'});
-my $first_sam = 1;
-foreach my $sam_fn (@samfiles) {
-    if(!exists $global_options->{'silent'}) { print "Parsing: $sam_fn\n"; }
-    open my $sam_fh, "<", $sam_fn or die "**ERROR: could not open sam file $!\n";
-    while(<$sam_fh>) {
-        chomp $_;
-        if($_ =~ /^@/) {
-            # work out and store contig lengths
-            next if(1 != $first_sam);
-            my @fields = split(/:/, $_);
-            $fields[1] =~ s/\tLN//;
-            my $con_id = $fields[1];
-            my $con_int = 0;
-            if(!exists $global_con_2_int{$con_id}) {
-                $con_int = $global_conInt;
-                $global_conInt++;
-                $global_con_2_int{$con_id} = $con_int;
-                $global_int_2_con{$con_int} = $con_id;
-            } else {
-                $con_int = $global_con_2_int{$con_id};
-            }
-            $global_con_2_len{$con_int} = $fields[2];         
-        } else {
-            my @sam_fields = split(/\t/, $_);
-            my @mapping_flags = split(//, dec2bin($sam_fields[1]));
-            
-            # make sure it mapped
-            next if($mapping_flags[5] eq "1");
-            
-            # get a contig ID (int)
-            my $con_id = $sam_fields[2];
-            if(!exists $global_con_2_int{$con_id}) {
-                croak "Unknown contig ID: $con_id\n";
-            }
-            $con_id = $global_con_2_int{$con_id};
-            
-            # make sure it hit one of our contigs
-            if(exists $global_con_2_len{$con_id}) {
-                # make sure there's a container for our read ID
-                my $read_id = $sam_fields[0];
-                $read_id =~ s/_.$//;
-                $read_id =~ s/\.[rf]$//;
-                my $position = int($sam_fields[3]);
-                my $prob = int($sam_fields[4]);
-                if(!exists $global_reads_2_map{$read_id}) {
-                    my @tmp = ();
-                    $global_reads_2_map{$read_id} = \@tmp;
-                }
-                
-                # add it to the map
-                push @{$global_reads_2_map{$read_id}}, $con_id;
-                push @{$global_reads_2_map{$read_id}}, $position;
-                push @{$global_reads_2_map{$read_id}}, $prob;
-                if($sam_fields[1] eq '0') {
-                    push @{$global_reads_2_map{$read_id}}, 0;   
-                } elsif($sam_fields[1] eq '16') {
-                    push @{$global_reads_2_map{$read_id}}, 1; 
-                } else {
-                    croak "We are expecting sam mapping flags to be either '16' or '0'\n";
-                }
-            }
+#=================================================================================================
+# parse the bam/sam files
+#
+my @samfiles = ($global_options->{'bam1'});
+my $single_file = 1;
+if(exists $global_options->{'bam2'}) { push @samfiles, $global_options->{'bam2'}; $single_file = 0; }
+
+# open the first bam/sam file and get the contig lengths
+if(exists $global_options->{'sam'}) {
+	my $got_lengths = 0;
+	foreach my $samfile (@samfiles)
+	{
+		my $tam = Bio::DB::Tam::open (filename => $samfile);
+		my $header = $tam->header_read();
+		if(0 == $got_lengths)
+		{
+			my @name_array = @{$header->target_name};
+			my @length_array = @{$header->target_len};
+			foreach my $i (0..$#name_array)
+			{
+			    $global_con_2_int{$name_array[$i]} = $i;
+			    $global_int_2_con{$i} = $name_array[$i];  
+			    $global_con_2_len{$i} = $length_array[$i];
+			}
+			$got_lengths = 1;
+		}
+		
+		while(1)
+		{
+			my $alignment = Bio::DB::Bam::Alignment->new;
+			my $bytes = $tam->read1($header,$alignment);
+			last if($bytes == -1);
+			parseAlignment($alignment);
+		}
+	}
+}
+else { 
+    my $got_lengths = 0;
+    foreach my $bamfile (@samfiles)
+    {
+		my $bam = Bio::DB::Sam -> new (-bam => $bamfile, -fasta => $global_options->{'reference'});
+        if(0 == $got_lengths)
+        {
+		    my @name_array= $bam->seq_ids;
+		    my $i = 0;
+			foreach my $seqid (@name_array) {
+				my $length = $bam->length($seqid);
+		        $global_con_2_int{$name_array[$i]} = $i;
+		        $global_int_2_con{$i} = $name_array[$i];  
+		        $global_con_2_len{$i} = $length;
+		        $i += 1;
+			}
+            $got_lengths = 1;
+        }
+        my @alignments = $bam->features();
+        foreach my $alignment (@alignments) 
+        {
+            parseAlignment($alignment);
         }
     }
-    $first_sam = 0;
-    close $sam_fh;
 }
+
 if(!exists $global_options->{'silent'}) { print "Read ".scalar(keys %global_con_2_len)." contigs from the SAM files.\n"; }
-
-
-
 
 #=================================================================================================
 # Remove PCR duplicates. A duplicate is defined as:
@@ -316,9 +309,9 @@ if(!exists $global_options->{'silent'}) {
     print "Stats estimate:\n";
     print "Mean: $mean\nStdev: $stdev\n";
     print "Not accepting insert greater than $upper_limit or less than $lower_limit.\n";
-    print "Found $type_array[2] read pairs facing inwards on the same contig (type 2 read pairs). This is what you want for IonTorrent mate pair data.\n";
-    print "Found $type_array[0] read pairs facing outwards on the same contig (type 0 read pairs). This is not what you want for mate pair data.\n";
-    print "Found $type_array[1] read pairs facing the same direction on the same contig (type 1 read pairs). This is not what you want for IonTorrent mate pair data.\n";
+    print "Found $type_array[2] read pairs facing inwards on the same contig (type 2 read pairs). (indicates: IonTorrent MP, Illumina PE)\n";
+    print "Found $type_array[0] read pairs facing outwards on the same contig (type 0 read pairs). (indicates: Illumina MP)\n";
+    print "Found $type_array[1] read pairs facing the same direction on the same contig (type 1 read pairs). (indicates: Wicked voodoo read mojo).\n";
     print "\nProceding using type $true_type as the expected mate pair type\n*****\n";
 }
 ##
@@ -440,6 +433,40 @@ sub revcompl {
     return scalar reverse $seq;
 }
 
+sub parseAlignment {
+	# parse an individual alignment object
+	my ($alignment) = @_;
+
+    # make sure it mapped
+    return if($alignment->unmapped);
+            
+    # get a contig ID (int)
+    my $con_id = int($alignment->tid);
+    
+    # make sure it hit one of our contigs
+    if(exists $global_con_2_len{$con_id}) {
+        # make sure there's a container for our read ID
+        my $read_id = $alignment->qname;
+        $read_id =~ s/_.$//;
+        $read_id =~ s/\.[rf]$//;
+        if(!exists $global_reads_2_map{$read_id}) {
+            my @tmp = ();
+            $global_reads_2_map{$read_id} = \@tmp;
+        }
+                
+        # add it to the map
+        push @{$global_reads_2_map{$read_id}}, $con_id;
+        push @{$global_reads_2_map{$read_id}}, $alignment->pos;
+        push @{$global_reads_2_map{$read_id}}, $alignment->qual;
+        
+        # work out strandedness
+        if($alignment->reversed) {
+            push @{$global_reads_2_map{$read_id}}, 1; 
+        } else {
+            push @{$global_reads_2_map{$read_id}}, 0;   
+        }
+    }
+}
 
 ######################################################################
 # TEMPLATE SUBS
@@ -451,7 +478,7 @@ sub checkParams {
     #-----
     # Do any and all options checking here...
     #
-    my @standard_options = ("sam1|1:s", "sam2|2:s", "reference_fasta|f:s", "working_dir|w:s", "help|h+", "max_insert|m:i", "min_links|l:i", "silent|s+");
+    my @standard_options = ("bam1|1:s", "bam2|2:s", "sam|s+", "reference_fasta|f:s", "working_dir|w:s", "help|h+", "max_insert|m:i", "min_links|l:i", "silent|t+");
     my %options;
 
     # Add any other command line options, and the code to handle them
@@ -470,8 +497,7 @@ sub checkParams {
     exec("pod2usage $0") if $options{'help'};
 
     # Compulsory items
-    if(!(exists $options{'sam1'})) { printParamError ("No forward SAM file supplied."); }
-    if(!(exists $options{'sam2'})) { printParamError ("No reverse SAM file supplied."); }
+    if(!(exists $options{'bam1'})) { printParamError ("No forward SAM file supplied."); }
     if(!(exists $options{'reference_fasta'})) { printParamError ("No reference fasta file supplied."); }
 
     return \%options;
@@ -661,29 +687,30 @@ __Script__Name__
 
 =head1 DESCRIPTION
 
-    Parse a pair of sam files and determine read pairs which link contigs 
+    Parse bam files and determine read pairs which link contigs 
 
 =head1 SYNOPSIS
 
-    ionPairer.pl -sam1|1 SAMFILE1 -sam2|2 SAMFILE2 -reference_fasta|f REFERENCE_FASTA
+    ionPairer.pl -bam1|1 BAMFILE1 [-bam2|2 BAMFILE2] -reference_fasta|f REFERENCE_FASTA
 
-    -sam1 -1 SAMFILE1                    Sam file of forward read
-    -sam2 -2 SAMFILE2                    Sam file of reverse read
+    -bam1 -1 BAMFILE1                    Bam file of forward read
+    [-bam2 -2 BAMFILE2]                  Bam file of reverse read (if separate)
     -reference_fasta -f REFERENCE_FASTA  Fasta file of sequences to be scaffolded (used during creation of sam files)
+    [-sam -s]                            Input is in SAM format 
     [-working_dir -w]                    Somewhere to write all the files
     [-min_links -l]                      Minimum number of links to report in the dot file [default: 3]
     [-max_insert -m]                     Maximum insert size accepted [default: mean + 2 * std measured empirically (middle 80% paired reads)]
-    [-silent -s]                         Suppress print statements
+    [-silent -t]                         Suppress print statements
 
     Produces output files:
     
-     SAMFILE1.unpaired.csv                           - Reads where only one end mapped to a contig
-     SAMFILE1.pcr_duplicates.csv                     - Reads removed from further analysis as they were judged to be PCR duplicates
-     SAMFILE1.paired.csv                             - Reads where both ends mapped onto one contig
-     SAMFILE1.error_paired.csv                       - Reads where both ends mapped, but erroneously due to insert size or relative orientation
-     SAMFILE1.unique_links.csv                       - All pairs of mate pairs that span between two contigsand pass the pcr filter  
-     SAMFILE1.short_links.csv                        - Pairs where one of the contigs was shorter than the insert size
-     SAMFILE1.unique_links.csv.error_links.csv       - Pairs which link two contigs, but erroneously due to insert size, position or relative orientation
-     SAMFILE1.unique_links.csv.filtered_links.csv    - Subset of unique pairs which are neither short nor erroneous
+     BAMFILE1.unpaired.csv                           - Reads where only one end mapped to a contig
+     BAMFILE1.pcr_duplicates.csv                     - Reads removed from further analysis as they were judged to be PCR duplicates
+     BAMFILE1.paired.csv                             - Reads where both ends mapped onto one contig
+     BAMFILE1.error_paired.csv                       - Reads where both ends mapped, but erroneously due to insert size or relative orientation
+     BAMFILE1.unique_links.csv                       - All pairs of mate pairs that span between two contigsand pass the pcr filter  
+     BAMFILE1.short_links.csv                        - Pairs where one of the contigs was shorter than the insert size
+     BAMFILE1.unique_links.csv.error_links.csv       - Pairs which link two contigs, but erroneously due to insert size, position or relative orientation
+     BAMFILE1.unique_links.csv.filtered_links.csv    - Subset of unique pairs which are neither short nor erroneous
      
 =cut
