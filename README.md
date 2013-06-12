@@ -41,6 +41,11 @@ Note: those people at ACE need only ```module load ionPairer```.
 
 ## First map mate pair reads against the assembly
 
+For IonTorrent read and certain versions of BWA, it may be helpful to run bwa twice,
+once for the forward reads and once for the reverse reads.
+
+ie.
+
 Take your existing assembly (or binned contigs from a metagenome), then
 run ```bwa-sw``` twice (once for each of the forward and reverse reads) to map your
 ion MP reads against your contigs. e.g.
@@ -51,9 +56,17 @@ $ bwa bwasw my_assembly.fna forward_mates.fna >forward_matesVmy_assembly.sam
 $ bwa bwasw my_assembly.fna reverse_mates.fna >reverse_matesVmy_assembly.sam
 ```
 
+For Illumina-type reads, you can just run BWA once with both pairs. Perhaps
+makeSam.py would be helpful here: http://www.github.com/minillinim/mikesbioscripts
+
 ## Then run ionPairer:
 ```sh
-$ ionPairer.pl -sam1 forward_matesVmy_assembly.sam -sam2 reverse_matesVmy_assembly.sam -w ion_pairer_outputs
+$ ionPairer.pl -sam1 forward_matesVmy_assembly.sam -sam2 reverse_matesVmy_assembly.sam -s -w ion_pairer_outputs
+```
+or
+
+```sh
+$ ionPairer.pl -1 pairedReads_Vmy_assembly.bam -w ion_pairer_outputs
 ```
 
 In that output directory ```ion_pairer_outputs``` there should be the following files:
